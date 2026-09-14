@@ -1,0 +1,23 @@
+# Virtuell miljö
+.venv/
+venv/
+env/
+
+# Python-cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# Dataset och tränade ML-modeller (håller repot lätt)
+*.joblib
+*.pkl
+*.csv
+
+# Miljövariabler och nycklar
+.env
+
+
