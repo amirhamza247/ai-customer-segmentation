@@ -48,7 +48,7 @@ mkdir -p data
 mv ~/Downloads/online_retail_II.csv data/
 
 # 3. Bygg databasen
-uv run python 01_ladda_data.py
+uv run python databearbetning/01_ladda_data.py
 ```
 
 Kontrollera att filen är rätt: 1 067 371 rader och headern
