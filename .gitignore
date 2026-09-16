@@ -12,10 +12,11 @@ __pycache__/
 # Streamlit
 .streamlit/
 
-# Dataset och tränade ML-modeller (håller repot lätt)
+# Dataset, databas och tränade ML-modeller (håller repot lätt)
 *.joblib
 *.pkl
 *.csv
+*.db
 
 # Miljövariabler och nycklar
 .env

@@ -11,6 +11,7 @@ dependencies = [
     "pandas>=3.0.5",
     "scikit-learn>=1.9.1",
     "seaborn>=0.13.2",
+    "sqlalchemy>=2.0.54",
     "streamlit>=1.63.0",
 ]
 
