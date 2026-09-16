@@ -11,11 +11,13 @@ dependencies = [
     "pandas>=3.0.5",
     "scikit-learn>=1.9.1",
     "seaborn>=0.13.2",
+    "sqlalchemy>=2.0.54",
     "streamlit>=1.63.0",
 ]
 
 [dependency-groups]
 dev = [
     "black>=26.5.1",
+    "ipykernel>=7.3.0",
     "ruff>=0.16.7",
 ]
