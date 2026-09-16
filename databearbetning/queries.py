@@ -17,9 +17,9 @@ WITH kunder AS (
         julianday(:snapshot) - julianday(date(MIN(invoice_date))) AS dagar_som_kund
     FROM transactions
     WHERE customer_id IS NOT NULL
-      AND quantity > 0
-      AND unit_price > 0
-      AND invoice_no NOT LIKE 'C%'
+        AND quantity > 0
+        AND unit_price > 0
+        AND invoice_no NOT LIKE 'C%'
     GROUP BY customer_id
 )
 SELECT
@@ -39,7 +39,7 @@ ORDER BY customer_id
 """
 
 
-def load_customers(snapshot):
+def load_customers(snapshot):  
     """Kunddata per kund. snapshot som 'YYYY-MM-DD', t.ex. '2011-12-10'."""
     return pd.read_sql(text(CUSTOMERS_SQL), engine, params={"snapshot": snapshot})
 
