@@ -91,7 +91,9 @@ Målet: någon som öppnar repot för första gången förstår det på tio minu
 ## Git
 
 - En branch per sak, PR till `main` och `dev`, någon annan i gruppen läser innan merge.
-- Små commits med tydligt meddelande: `Steg 4a: app.py med översiktssida`.
+- **Committa ofta.** En commit per avklarad ändring som fungerar (körd och testad), inte en stor
+  i slutet. Blanda inte olika ändringar i samma commit, då går de inte att dela upp eller backa var för sig.
+- Tydligt meddelande: `Steg 4a: app.py med översiktssida`.
 - Checka in koden som skapar filer, inte filerna (`*.db`, `*.csv`, `*.pkl` ligger i `.gitignore`).
   Undantag: `data/app.db` och `models/modell.pkl`, som den publicerade appen behöver. Committa dem bara
   efter medveten omträning, och bara en person åt gången (binärfiler går inte att merga).
