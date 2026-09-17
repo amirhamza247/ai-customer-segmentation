@@ -1,9 +1,14 @@
-"""SQL-frågor mot data/kunder.db."""
+"""SQL-frågor mot databaserna."""
 
 import pandas as pd
 from sqlalchemy import create_engine, text
 
+# Hela datan, stannar lokalt (138 MB, över GitHubs gräns på 100 MB)
 engine = create_engine("sqlite:///data/kunder.db")
+# Bara tabellen segments (under 1 MB), checkas in så att den publicerade appen har data
+app_engine = create_engine("sqlite:///data/app.db")
+# Dagen efter sista transaktionen i datasetet. Recency räknas härifrån.
+SNAPSHOT = "2011-12-10"
 
 # En rad per kund. date() på fakturadatumet ger hela dagar, så en kund som
 # handlade dagen före :snapshot får recency 1, inte 0,47.
@@ -39,13 +44,18 @@ ORDER BY customer_id
 """
 
 
-def load_customers(snapshot):  
-    """Kunddata per kund. snapshot som 'YYYY-MM-DD', t.ex. '2011-12-10'."""
+def load_customers(snapshot=SNAPSHOT):
+    """Kunddata per kund. snapshot som 'YYYY-MM-DD'."""
     return pd.read_sql(text(CUSTOMERS_SQL), engine, params={"snapshot": snapshot})
 
 
+def load_segments():
+    """Tabellen segments som 03_trana.py skriver: en rad per kund med kluster och segmentnamn."""
+    return pd.read_sql("SELECT * FROM segments", app_engine)
+
+
 if __name__ == "__main__":
-    df = load_customers("2011-12-10")
+    df = load_customers()
     print(df.head())
     print(df.describe().round(1))
     assert len(df) == 5878, len(df)

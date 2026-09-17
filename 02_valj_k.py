@@ -8,12 +8,10 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import davies_bouldin_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
 
-from databearbetning.prepare import prepare
-from databearbetning.queries import load_customers
+from prepare import prepare
+from queries import load_customers
 
-SNAPSHOT = "2011-12-10"
-
-X = StandardScaler().fit_transform(prepare(load_customers(SNAPSHOT)))
+X = StandardScaler().fit_transform(prepare(load_customers()))
 
 rader = []
 for k in range(2, 11):

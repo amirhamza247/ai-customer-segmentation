@@ -17,6 +17,9 @@ __pycache__/
 *.pkl
 *.csv
 *.db
+# Undantag: det appen behöver, små nog för git. Committa bara efter medveten omträning.
+!data/app.db
+!models/modell.pkl
 
 # Miljövariabler och nycklar
 .env

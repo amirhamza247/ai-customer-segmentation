@@ -11,14 +11,13 @@ import seaborn as sns
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from databearbetning.prepare import FEATURES, prepare
-from databearbetning.queries import engine, load_customers
+from prepare import FEATURES, prepare
+from queries import SNAPSHOT, app_engine, load_customers
 
-SNAPSHOT = "2011-12-10"
 K = 5  # vald i 02_valj_k.py
 
 # 1. Data
-df = load_customers(SNAPSHOT)
+df = load_customers()
 scaler = StandardScaler()
 X = scaler.fit_transform(prepare(df))
 
@@ -42,7 +41,9 @@ def namnge(profil):
         ("Lost", "recency", "idxmax"),  # längst sedan senaste köp
         ("At risk", "recency", "idxmax"),  # också länge sedan, men köpte mer än Lost
         ("Loyal", "frequency", "idxmax"),  # av de två aktiva: handlar oftast
-        ("New customers", "frequency", "idxmin"),  # aktiva men få köp än så länge
+        # Aktiva men få köp. Inte "New customers": bara 31 % köpte första gången inom 90 dagar,
+        # och modellen har ingen variabel för hur länge någon varit kund.
+        ("Occasional", "frequency", "idxmin"),
     ]:
         cluster = getattr(kvar[kolumn], valj)()
         namn[int(cluster)] = segment
@@ -92,11 +93,11 @@ joblib.dump(
 
 # 6. Tabellen appen läser
 kolumner = ["customer_id", "recency", "frequency", "monetary", "ltv", "rfm", "cluster", "segment_name"]
-df[kolumner].to_sql("segments", engine, if_exists="replace", index=False)
+df[kolumner].to_sql("segments", app_engine, if_exists="replace", index=False)
 
 print("\nKunder per kluster:")
 for cluster, antal in df.cluster.value_counts().sort_index().items():
     varning = "  VARNING: färre än 50 kunder" if antal < 50 else ""
     print(f"  {cluster} {segment_names[cluster]:<14} {antal:>5}{varning}")
 
-print("\nSparat: models/modell.pkl, tabellen segments, rapport/relative_importance.png")
+print("\nSparat: models/modell.pkl, data/app.db, rapport/relative_importance.png")

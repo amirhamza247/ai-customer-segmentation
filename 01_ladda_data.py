@@ -4,10 +4,11 @@ Ingen rensning här: tabellen ska spegla källfilen.
 """
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+
+from queries import engine
 
 CSV_PATH = "data/online_retail_II.csv"
-DB_URL = "sqlite:///data/kunder.db"
 
 df = pd.read_csv(
     CSV_PATH,
@@ -35,7 +36,6 @@ df["invoice_date"] = pd.to_datetime(df["invoice_date"]).dt.strftime("%Y-%m-%d %H
 df["quantity"] = df["quantity"].astype("int64")
 df["unit_price"] = df["unit_price"].astype("float64")
 
-engine = create_engine(DB_URL)
 df.to_sql("transactions", engine, if_exists="replace", index=False, chunksize=10000)
 
 with engine.begin() as conn:
