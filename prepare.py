@@ -26,9 +26,9 @@ def prepare(df):
 
 
 if __name__ == "__main__":
-    from databearbetning.queries import load_customers
+    from queries import load_customers
 
-    kunder = load_customers("2011-12-10")
+    kunder = load_customers()
     X = prepare(kunder)
     print(X.describe().round(2))
     print("Skevhet före:", kunder[FEATURES].skew().round(1).to_dict())

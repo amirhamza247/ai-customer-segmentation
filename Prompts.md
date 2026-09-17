@@ -2,6 +2,9 @@
 
 Kopiera en prompt i taget till din AI-assistent, i ordning.
 
+Reglerna för koden (struktur, stil, ML-regler, git) står i `CLAUDE.md` och läses
+automatiskt av agenten. Prompterna här säger bara *vad* som ska byggas.
+
 ---
 
 ## Så funkar det (enkel förklaring)
@@ -57,7 +60,8 @@ Utan log-transform drar de till sig ett eget kluster.
 Sätt upp ett Python-projekt med uv. Beroenden: pandas, numpy, scikit-learn,
 matplotlib, seaborn, sqlalchemy, streamlit, joblib.
 
-Skapa .gitignore (.venv, __pycache__, *.db, *.pkl, data/*.csv) och en
+Skapa .gitignore (.venv, __pycache__, *.db, *.pkl, data/*.csv, men checka in
+data/app.db och models/modell.pkl som appen behöver) och en
 README som förklarar hur man sätter upp miljön och återskapar databasen.
 Ge mig kommandona jag ska köra.
 ```
@@ -68,7 +72,8 @@ Ge mig kommandona jag ska köra.
 
 ```
 Skriv 01_ladda_data.py som laddar online_retail_II.csv till tabellen
-transactions i data/kunder.db (sqlalchemy, to_sql, chunksize=10000).
+transactions i data/kunder.db (to_sql, chunksize=10000). Databaskopplingen
+`engine` importeras från queries.py.
 
 - Döp om kolumnerna till: invoice_no, stock_code, description, quantity,
   invoice_date, unit_price, customer_id, country
@@ -101,7 +106,8 @@ Skriv en mening under varje figur om vad den betyder för modellen.
 ## Steg 1c: en rad per kund
 
 ```
-Skriv queries.py med en SQL-fråga som gör om tabellen transactions i
+Skriv queries.py med `engine` (data/kunder.db), `SNAPSHOT = "2011-12-10"`
+och en SQL-fråga som gör om tabellen transactions i
 SQLite till en rad per kund. Använd julianday() för datum och en namngiven
 parameter :snapshot.
 
@@ -122,7 +128,7 @@ Kolumner:
 
 Lägg aggregeringen i en CTE och NTILE i den yttre SELECT-satsen.
 
-Skriv också load_customers(snapshot) som kör frågan med pandas.read_sql.
+Skriv också load_customers(snapshot=SNAPSHOT) som kör frågan med pandas.read_sql.
 Den ska ge ungefär 5 878 rader.
 ```
 
@@ -151,7 +157,7 @@ och måste sparas.
 ## Steg 3a: välj antal kluster
 
 ```
-Skriv 02_valj_k.py. Data: load_customers -> prepare -> StandardScaler.
+Skriv 02_valj_k.py. Data: load_customers() -> prepare -> StandardScaler.
 
 För k = 2..10: räkna inertia (elbow), silhouette och Davies-Bouldin.
 KMeans med random_state=42, n_init=10.
@@ -167,20 +173,33 @@ Föreslå ett k med motivering, men låt oss välja.
 ```
 Skriv 03_trana.py:
 
-1. load_customers -> prepare -> StandardScaler.fit_transform
+1. load_customers() -> prepare -> StandardScaler.fit_transform
 2. KMeans med vårt k, random_state=42, n_init=10
 3. Relative importance på OTRANSFORMERADE värden:
    df.groupby("cluster")[FEATURES].mean() / df[FEATURES].mean() - 1
    Rita som heatmap och spara som png.
 4. Ge varje kluster ett namn utifrån värdena, till exempel Champions, Loyal,
-   New customers, At risk eller Lost. Visa också den vanligaste rfm-koden
+   Occasional, At risk eller Lost. Namnet får bara påstå det modellen mäter:
+   "New customers" kräver hur länge någon varit kund, och det finns inte i
+   FEATURES. Visa också den vanligaste rfm-koden
    per kluster som stöd.
 5. Spara scaler, kmeans, FEATURES, namnen och snapshot i EN dict i
    models/modell.pkl med joblib.
-6. Skriv tabellen segments till SQLite: customer_id, recency, frequency,
-   monetary, ltv, rfm, cluster, segment_name.
+6. Skriv tabellen segments till data/app.db (app_engine i queries.py):
+   customer_id, recency, frequency, monetary, ltv, rfm, cluster, segment_name.
+   Den lilla databasen checkas in så att den publicerade appen har data.
 
 Skriv ut antal kunder per kluster. Varna om något kluster har färre än 50.
+```
+
+---
+
+## Steg 3c: visualisera segmenten
+
+```
+Skriv 04_visualisera.py som läser segments med load_segments() (lägg till den
+i queries.py). Rita recency mot monetary (log-skala), färg per segment, och
+skriv segmentnamnet vid segmentets median. Spara som rapport/kluster.png.
 ```
 
 ---
@@ -188,8 +207,8 @@ Skriv ut antal kunder per kluster. Varna om något kluster har färre än 50.
 ## Steg 4a: Streamlit
 
 ```
-Bygg app.py som läser tabellen segments från data/kunder.db med
-@st.cache_data. Appen får aldrig anropa fit.
+Bygg app.py som läser tabellen segments med load_segments() och
+@st.cache_data.
 
 Sidor via st.sidebar.radio:
 
@@ -201,8 +220,6 @@ Sidor via st.sidebar.radio:
 3. Kundlista: filtrera på segment, visa tabellen, ladda ner som CSV
 4. Kundsökning: skriv in customer_id och visa segment, rfm och ltv mot
    snittet
-
-Visa ingen annan persondata än customer_id.
 ```
 
 ---
@@ -214,7 +231,6 @@ Lägg till sidan "Ny kund" i app.py.
 
 Fyra number_input: recency, frequency, monetary, ltv (default = medianen).
 Ladda models/modell.pkl, kör prepare -> scaler.transform -> kmeans.predict.
-Använd aldrig fit här, det ger tyst fel segment.
 Visa segmentnamnet och kundens värden bredvid segmentets snitt.
 ```
 
@@ -232,14 +248,8 @@ koden:
 4. Val av k (elbow, silhouette, Davies-Bouldin)
 5. Tolkning med relative importance
 6. Begränsningar: LTV antar att kunden stannar 3 år och tar inte hänsyn
-   till churn, ingen marginaldata eller demografi, 90 % Storbritannien
+   till churn, ingen marginaldata eller demografi, 90 % Storbritannien.
+   LTV räknas ur monetary, så klustringen väger spenderat ungefär dubbelt.
+   Modellen vet inte hur länge någon varit kund: bara 31 % av Occasional
+   köpte första gången inom 90 dagar, därför inte "New customers".
 ```
-
----
-
-## Kom ihåg
-
-- `prepare()` används både i träning och i appen. Det är samma funktion
-  från samma fil.
-- `fit` körs bara i 03_trana.py. Allt annat laddar modell.pkl.
-- Kan ni inte förklara en rad kod, be om en enklare version.

@@ -36,6 +36,9 @@ Följande checkas **inte** in (se `.gitignore`):
 
 Grundregeln: koden som skapar filerna checkas in, inte filerna.
 
+Undantag: `data/app.db` (bara tabellen `segments`, under 1 MB) och `models/modell.pkl` (25 KB)
+checkas in. Det är allt Streamlit-appen behöver, så den går att köra och publicera utan CSV-filen.
+
 ## Återskapa datan lokalt
 
 ```bash
@@ -48,7 +51,7 @@ mkdir -p data
 mv ~/Downloads/online_retail_II.csv data/
 
 # 3. Bygg databasen
-uv run python databearbetning/01_ladda_data.py
+uv run python 01_ladda_data.py
 ```
 
 Kontrollera att filen är rätt: 1 067 371 rader och headern
