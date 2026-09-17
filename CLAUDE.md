@@ -49,9 +49,10 @@ Allt ligger platt i roten. Inga undermappar för kod.
 
 | Fil                        | Ansvar                                                                  |
 | -------------------------- | ----------------------------------------------------------------------- |
-| `queries.py`               | Databaserna, `SNAPSHOT` och all SQL. Ingen SQL någon annanstans.         |
+| `queries.py`               | Databaserna, `SNAPSHOT` och alla frågor som läser data.                 |
 | `prepare.py`               | Enda transformeringen före modellen. Delas av träning och app.          |
-| `01_ladda_data.py` … `04_*` | Pipeline-steg, körs i nummerordning, ett ansvar per fil.                |
+| `01_ladda_data.py`         | Bygger databasen: tabell, index och kontroll av antal rader.            |
+| `02_valj_k.py` … `04_*`    | Pipeline-steg, körs i nummerordning, ett ansvar per fil.                |
 | `app.py`                   | Allt användaren ser och klickar på.                                     |
 | `rapport/`                 | PNG-figurer och underlag till rapporten.                                |
 | `eda_robin.ipynb`          | Utforskning av rådatan. Ingår inte i flödet.                            |
