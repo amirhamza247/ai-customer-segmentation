@@ -1,6 +1,12 @@
 import streamlit as st
 
-from segmentation import REQUIRED_COLUMNS, calculate_rfm, clean_transactions, scale_rfm
+from segmentation import (
+    REQUIRED_COLUMNS,
+    calculate_rfm,
+    choose_k,
+    clean_transactions,
+    scale_rfm,
+)
 
 
 def main():
@@ -83,6 +89,24 @@ def main():
     # Restore the ID as a visible column only for display. scaled_rfm itself
     # contains just the three numeric features needed for later clustering.
     st.dataframe(scaled_rfm.reset_index(), hide_index=True)
+
+    st.subheader("Suggested number of clusters")
+    st.caption(
+        "Compare K = 2 through 8, limited by the number of customers and distinct "
+        "RFM profiles. Temporary K-Means models are fitted for evaluation only. "
+        "Silhouette scores range from -1 to 1; higher is better. The highest "
+        "score suggests a K, but does not guarantee useful business segments. "
+        "Scores use all customers, so large uploads may take longer."
+    )
+    try:
+        with st.spinner("Comparing candidate K values..."):
+            best_k, scores = choose_k(scaled_rfm)
+    except ValueError as error:
+        st.warning(str(error))
+        return
+    st.write(f"Suggested K: {best_k} (highest silhouette score among candidates).")
+    st.dataframe(scores, hide_index=True)
+    st.caption("No final model has been trained or customer segments assigned.")
 
 
 # This guard runs the UI when executed, but not when another module imports it.

@@ -1,4 +1,6 @@
 import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 REQUIRED_COLUMNS = ["Invoice", "Quantity", "InvoiceDate", "Price", "Customer ID"]
@@ -124,3 +126,35 @@ def scale_rfm(rfm):
     # For future customers, reuse a fitted scaler's transform(), rather than
     # fitting a new scale that would be inconsistent with a trained model.
     return pd.DataFrame(values, index=features.index, columns=features.columns)
+
+
+def choose_k(scaled_rfm):
+    """Return a suggested K and silhouette scores; retain no fitted model."""
+    features = scaled_rfm[["Recency", "Frequency", "Monetary"]]
+    # Silhouette needs at least 2 clusters and fewer clusters than customers.
+    # Duplicate profiles cannot form separate clusters, even with different IDs.
+    max_k = min(8, len(features) - 1, len(features.drop_duplicates()))
+    if max_k < 2:
+        raise ValueError(
+            "K selection needs at least 3 customers and 2 distinct RFM profiles."
+        )
+
+    scores = []
+    for k in range(2, max_k + 1):
+        # These are temporary candidate models, not the final segmentation model.
+        # Multiple starts reduce sensitivity to initial centers; a fixed seed
+        # makes comparisons reproducible. Customer IDs never enter the fit.
+        labels = KMeans(n_clusters=k, n_init=10, random_state=42).fit_predict(features)
+        if len(set(labels)) != k:
+            continue
+        # Score all customers: random sampling can miss small clusters.
+        # Higher silhouette means tighter clusters with better separation.
+        score = silhouette_score(features, labels)
+        scores.append({"K": k, "Silhouette score": score})
+
+    if not scores:
+        raise ValueError("No candidate K produced the requested number of clusters.")
+    results = pd.DataFrame(scores)
+    # idxmax returns the first maximum, so an exact tie favors the smaller K.
+    best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"])
+    return best_k, results
