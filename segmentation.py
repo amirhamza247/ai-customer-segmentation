@@ -158,3 +158,36 @@ def choose_k(scaled_rfm):
     # idxmax returns the first maximum, so an exact tie favors the smaller K.
     best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"])
     return best_k, results
+
+
+def cluster_customers(scaled_rfm, k):
+    """Return the fitted model and cluster IDs indexed by customer ID."""
+    features = scaled_rfm[["Recency", "Frequency", "Monetary"]]
+    if not features.index.is_unique:
+        raise ValueError("Each customer must have exactly one RFM profile.")
+    if not 2 <= k <= len(features.drop_duplicates()):
+        raise ValueError("K must be between 2 and the number of distinct RFM profiles.")
+
+    # Match the candidate settings so the final fit reproduces the selected run.
+    # Fit on scaled features, while retaining original RFM for interpretation.
+    model = KMeans(n_clusters=k, n_init=10, random_state=42)
+    labels = model.fit_predict(features)
+    if len(set(labels)) != k:
+        raise ValueError("The final model could not form the requested number of clusters.")
+    # fit_predict returns labels in input row order. Attaching the customer index
+    # lets the UI join by ID safely, even if the original RFM rows are reordered.
+    assignments = pd.Series(labels, index=features.index, name="Cluster")
+    return model, assignments
+
+
+def summarize_clusters(clustered_rfm):
+    """Summarize assigned customers using RFM in its original units."""
+    # Each input row represents one customer, so size counts customers rather
+    # than transactions. Means give each customer equal weight, regardless of
+    # how many purchases they made; they are not averages of transaction rows.
+    return clustered_rfm.groupby("Cluster", as_index=False).agg(
+        CustomerCount=("Customer ID", "size"),
+        AverageRecency=("Recency", "mean"),
+        AverageFrequency=("Frequency", "mean"),
+        AverageMonetary=("Monetary", "mean"),
+    )

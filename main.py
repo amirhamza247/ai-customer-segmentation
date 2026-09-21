@@ -5,7 +5,9 @@ from segmentation import (
     calculate_rfm,
     choose_k,
     clean_transactions,
+    cluster_customers,
     scale_rfm,
+    summarize_clusters,
 )
 
 
@@ -106,7 +108,45 @@ def main():
         return
     st.write(f"Suggested K: {best_k} (highest silhouette score among candidates).")
     st.dataframe(scores, hide_index=True)
-    st.caption("No final model has been trained or customer segments assigned.")
+    st.subheader("Customer cluster assignments")
+    try:
+        with st.spinner("Training the final K-Means model..."):
+            model, assignments = cluster_customers(scaled_rfm, best_k)
+    except ValueError as error:
+        st.error(str(error))
+        return
+    # Join by customer ID, not row position. Validation guards against accidental
+    # duplicate IDs multiplying rows. The original RFM table stays unchanged.
+    clustered_rfm = rfm.join(assignments, on="Customer ID", validate="one_to_one")
+    st.write(
+        f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters."
+    )
+    st.caption(
+        "The model uses scaled RFM. This table shows original RFM values for "
+        "interpretation. Cluster IDs start at 0 and are arbitrary labels, not "
+        "rankings. No cluster names have been assigned."
+    )
+    st.dataframe(clustered_rfm, hide_index=True)
+
+    st.subheader("Cluster summary")
+    summary = summarize_clusters(clustered_rfm)
+    st.caption(
+        "Customer count and mean RFM per cluster, using original values: "
+        "Recency in days, Frequency in invoices, and Monetary in the source "
+        "data's currency. Each customer has equal weight. Averages can be "
+        "influenced by unusually large values."
+    )
+    # Format only the display; preserve full precision in the summary DataFrame.
+    st.dataframe(
+        summary,
+        hide_index=True,
+        column_config={
+            "CustomerCount": st.column_config.NumberColumn("Customer count", format="%d"),
+            "AverageRecency": st.column_config.NumberColumn("Average Recency", format="%.2f"),
+            "AverageFrequency": st.column_config.NumberColumn("Average Frequency", format="%.2f"),
+            "AverageMonetary": st.column_config.NumberColumn("Average Monetary", format="%.2f"),
+        },
+    )
 
 
 # This guard runs the UI when executed, but not when another module imports it.
