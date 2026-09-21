@@ -1,4 +1,5 @@
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 REQUIRED_COLUMNS = ["Invoice", "Quantity", "InvoiceDate", "Price", "Customer ID"]
 
@@ -98,3 +99,28 @@ def calculate_rfm(cleaned):
     # .dt accesses datetime/timedelta operations for an entire Series.
     rfm["Recency"] = (reference_date - rfm["LastPurchase"].dt.normalize()).dt.days
     return rfm[["Customer ID", "Recency", "Frequency", "Monetary"]], reference_date
+
+
+def scale_rfm(rfm):
+    """Return standardized RFM features, indexed by customer ID for traceability."""
+    if rfm.empty:
+        raise ValueError("Scaling requires at least one customer.")
+
+    # Select features explicitly: customer IDs are labels, not measurements.
+    # The index identifies rows but is not passed to StandardScaler or K-Means.
+    features = rfm.set_index("Customer ID")[["Recency", "Frequency", "Monetary"]]
+    if features.isna().any().any() or features.isin(
+        [float("inf"), float("-inf")]
+    ).any().any():
+        raise ValueError("RFM values must be finite numbers before scaling.")
+
+    # fit_transform learns each column's mean and standard deviation, then applies
+    # (value - mean) / standard deviation. This prevents units alone from making
+    # spending dominate distance calculations. It does not remove outliers.
+    # Constant columns (including a single-customer dataset) become zeros.
+    scaler = StandardScaler()
+    values = scaler.fit_transform(features)
+    # sklearn returns an array by default; restore labels and customer alignment.
+    # For future customers, reuse a fitted scaler's transform(), rather than
+    # fitting a new scale that would be inconsistent with a trained model.
+    return pd.DataFrame(values, index=features.index, columns=features.columns)

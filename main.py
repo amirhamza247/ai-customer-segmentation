@@ -1,6 +1,6 @@
 import streamlit as st
 
-from segmentation import REQUIRED_COLUMNS, calculate_rfm, clean_transactions
+from segmentation import REQUIRED_COLUMNS, calculate_rfm, clean_transactions, scale_rfm
 
 
 def main():
@@ -63,6 +63,26 @@ def main():
         "cleaned transaction."
     )
     st.dataframe(rfm, hide_index=True)
+
+
+
+# Scaled RFM
+    st.subheader("Scaled RFM")
+    try:
+        scaled_rfm = scale_rfm(rfm)
+    except ValueError as error:
+        st.error(str(error))
+        return
+    st.caption(
+        "Each feature is standardized as (value - mean) / standard deviation. "
+        "Zero means average; positive values are above average and negative values "
+        "are below average. Values are not limited to 0–1. Nonconstant columns "
+        "have mean 0 and population standard deviation 1; constant columns become "
+        "zeros. Scaling does not remove outliers. Customer IDs are labels only."
+    )
+    # Restore the ID as a visible column only for display. scaled_rfm itself
+    # contains just the three numeric features needed for later clustering.
+    st.dataframe(scaled_rfm.reset_index(), hide_index=True)
 
 
 # This guard runs the UI when executed, but not when another module imports it.
