@@ -74,3 +74,27 @@ def clean_transactions(csv_file):
     # .loc selects surviving rows. Reset their index without adding the old index
     # as a column. Do not deduplicate: repeated lines may be real transactions.
     return transactions.loc[keep].reset_index(drop=True), removals
+
+
+def calculate_rfm(cleaned):
+    """Return customer RFM values and the reference date for nonempty cleaned data."""
+    if cleaned.empty:
+        raise ValueError("RFM requires at least one cleaned transaction.")
+
+    # Use the dataset's dates rather than today so results stay reproducible.
+    # normalize() removes the time of day: recency measures calendar days,
+    # not completed 24-hour periods (which could give a latest purchase 0 days).
+    reference_date = cleaned["InvoiceDate"].max().normalize() + pd.Timedelta(days=1)
+    # assign() returns a new DataFrame, leaving the cleaned preview unchanged.
+    transactions = cleaned.assign(LineTotal=cleaned["Quantity"] * cleaned["Price"])
+
+    # Named aggregations use output_name=(source_column, operation).
+    # nunique counts purchases, not product lines belonging to the same invoice.
+    rfm = transactions.groupby("Customer ID", as_index=False).agg(
+        LastPurchase=("InvoiceDate", "max"),
+        Frequency=("Invoice", "nunique"),
+        Monetary=("LineTotal", "sum"),
+    )
+    # .dt accesses datetime/timedelta operations for an entire Series.
+    rfm["Recency"] = (reference_date - rfm["LastPurchase"].dt.normalize()).dt.days
+    return rfm[["Customer ID", "Recency", "Frequency", "Monetary"]], reference_date

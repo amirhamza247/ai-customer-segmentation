@@ -366,3 +366,46 @@ and
 A simple solution that solves the current POC
 
 prefer the simple solution.
+
+
+---
+
+
+# Learning Mode
+
+The developer is learning Python, pandas, ML, and agentic coding while building this project.
+
+When explaining code, focus especially on syntax, functions, methods, parameters, and arguments that may not be obvious to a junior developer.
+
+For important or non-obvious code, explain:
+
+* **What:** what the syntax/function/parameter does.
+* **Why:** why we use it here.
+* **Without it:** what would happen if we removed or changed it.
+* **Example:** when useful, show a tiny before/after example using realistic values.
+
+Example:
+
+`as_index=False`
+
+* **What:** keeps the grouping column as a normal DataFrame column.
+* **Why:** we want `Customer ID` to remain directly accessible.
+* **Without it:** `Customer ID` becomes the DataFrame index and we may need `reset_index()` later.
+
+For transformations, show intermediate values when that makes the behavior easier to understand.
+
+Example:
+
+```python
+cleaned["InvoiceDate"].max()
+# 2024-03-15 14:37:52
+
+cleaned["InvoiceDate"].max().normalize()
+# 2024-03-15 00:00:00
+```
+
+Explain that `normalize()` keeps the same date but resets the time component to midnight.
+
+Do not explain basic syntax repeatedly once it has already been explained unless asked.
+
+Keep source-code comments concise. Put detailed teaching explanations in the response rather than filling the production code with excessive comments.

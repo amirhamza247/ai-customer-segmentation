@@ -1,10 +1,10 @@
 import streamlit as st
 
-from segmentation import REQUIRED_COLUMNS, clean_transactions
+from segmentation import REQUIRED_COLUMNS, calculate_rfm, clean_transactions
 
 
 def main():
-    st.title("Customer transaction cleaning")
+    st.title("Customer transactions and RFM")
     st.write("Upload a UTF-8, comma-separated CSV to validate and clean transactions.")
     st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
     st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
@@ -46,6 +46,23 @@ def main():
     st.caption(f"Showing the first {min(len(cleaned), 1000):,} cleaned rows.")
     # Limit only the displayed preview; head() does not change cleaned or counts.
     st.dataframe(cleaned.head(1000), hide_index=True)
+
+
+
+
+# Customer RFM
+    with st.spinner("Calculating customer RFM..."):
+        rfm, reference_date = calculate_rfm(cleaned)
+    st.subheader("Customer RFM")
+    st.write(f"{len(rfm):,} customers. Reference date: {reference_date:%Y-%m-%d}.")
+    st.caption(
+        "Recency: calendar days since the latest purchase (lower means more recent). "
+        
+        "Frequency: distinct invoices. Monetary: total Quantity × Price in the "
+        "source data's currency. The reference date is one day after the latest "
+        "cleaned transaction."
+    )
+    st.dataframe(rfm, hide_index=True)
 
 
 # This guard runs the UI when executed, but not when another module imports it.
