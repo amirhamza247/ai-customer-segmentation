@@ -82,8 +82,11 @@ def main():
         st.error(str(error))
         return
     st.caption(
-        "Each feature is standardized as (value - mean) / standard deviation. "
-        "Zero means average; positive values are above average and negative values "
+        "Frequency and Monetary first use log1p(x) = ln(1 + x) to compress large "
+        "values; Recency is not log-transformed. All three features are then "
+        "standardized as (value - mean) / standard deviation. For Frequency and "
+        "Monetary, the mean and standard deviation are calculated after log1p. "
+        "Zero means average on that scale; positive values are above average and negative values "
         "are below average. Values are not limited to 0–1. Nonconstant columns "
         "have mean 0 and population standard deviation 1; constant columns become "
         "zeros. Scaling does not remove outliers. Customer IDs are labels only."

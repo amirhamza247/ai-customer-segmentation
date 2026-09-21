@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -104,7 +105,7 @@ def calculate_rfm(cleaned):
 
 
 def scale_rfm(rfm):
-    """Return standardized RFM features, indexed by customer ID for traceability."""
+    """Log-transform Frequency/Monetary, then standardize RFM without mutating it."""
     if rfm.empty:
         raise ValueError("Scaling requires at least one customer.")
 
@@ -116,6 +117,16 @@ def scale_rfm(rfm):
     ).any().any():
         raise ValueError("RFM values must be finite numbers before scaling.")
 
+    if (features[["Frequency", "Monetary"]] < 0).any().any():
+        raise ValueError("Frequency and Monetary must be nonnegative before log1p.")
+    # log1p(x) means natural log(1 + x). It compresses the long upper tails
+    # without dropping customers. Recency is not logged because its skew is milder.
+    # assign() creates a new frame, preserving original RFM for display/summaries.
+    features = features.assign(
+        Frequency=np.log1p(features["Frequency"]),
+        Monetary=np.log1p(features["Monetary"]),
+    )
+
     # fit_transform learns each column's mean and standard deviation, then applies
     # (value - mean) / standard deviation. This prevents units alone from making
     # spending dominate distance calculations. It does not remove outliers.
@@ -123,7 +134,7 @@ def scale_rfm(rfm):
     scaler = StandardScaler()
     values = scaler.fit_transform(features)
     # sklearn returns an array by default; restore labels and customer alignment.
-    # For future customers, reuse a fitted scaler's transform(), rather than
+    # For future customers, apply the same log1p step and reuse transform(), rather than
     # fitting a new scale that would be inconsistent with a trained model.
     return pd.DataFrame(values, index=features.index, columns=features.columns)
 
