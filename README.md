@@ -91,6 +91,11 @@ Streamlit will print a local address in the terminal, usually `http://localhost:
 
 ## CSV format
 
+The app is built for the **Online Retail II** dataset. Download `online_retail_II.csv` from Kaggle:
+https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci
+
+CSV files are in `.gitignore`, so keep the file anywhere on your computer and upload it in the app.
+
 Upload a UTF-8, comma-separated CSV containing these required columns:
 
 | Column | Description |

@@ -22,6 +22,10 @@ def main():
     st.write("Upload a UTF-8, comma-separated CSV to validate and clean transactions.")
     st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
     st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
+    st.caption(
+        "Dataset: [Online Retail II on Kaggle]"
+        "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)"
+    )
     # Streamlit reruns this function on interaction. Before an upload, the widget
     # returns None; afterward it returns a file-like object pandas can read.
     uploaded_file = st.file_uploader("Transaction CSV", type="csv")
