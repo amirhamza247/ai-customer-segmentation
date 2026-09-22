@@ -147,21 +147,13 @@ def main():
     # duplicate IDs multiplying rows. The original RFM table stays unchanged.
     clustered_rfm = rfm.join(assignments, on="Customer ID", validate="one_to_one")
     summary = name_clusters(summarize_clusters(clustered_rfm), rfm)
-    clustered_rfm = clustered_rfm.join(
-        summary.set_index("Cluster")["Description"],
-        on="Cluster",
-        validate="many_to_one",
-    )
     st.write(
         f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters." # type: ignore pylance
     )
     st.caption(
         "The model uses scaled RFM. This table shows original RFM values for "
         "interpretation. Cluster IDs start at 0 and are arbitrary labels, not "
-        "rankings. Descriptions compare each cluster's original RFM means with "
-        "the means across all customers in this upload. Lower Recency means "
-        "more recent purchases; exact equality is described as Average. "
-        "Descriptions summarize groups, not every member, and may repeat."
+        "rankings."
     )
     st.dataframe(clustered_rfm, hide_index=True)
 
@@ -176,6 +168,12 @@ def main():
         "data's currency. Each customer has equal weight. Averages can be "
         "influenced by unusually large values."
     )
+    st.caption(
+        "Descriptions compare each cluster's original RFM means with the means "
+        "across all customers in this upload. Lower Recency means more recent "
+        "purchases; exact equality is described as Average. Descriptions summarize "
+        "groups, not every member, and may repeat."
+    )
     # Format only the display; preserve full precision in the summary DataFrame.
     st.dataframe(
         summary,
@@ -186,6 +184,27 @@ def main():
             "AverageFrequency": st.column_config.NumberColumn("Average Frequency", format="%.2f"),
             "AverageMonetary": st.column_config.NumberColumn("Average Monetary", format="%.2f"),
         },
+    )
+
+    st.subheader("Customer segments: Recency vs Monetary")
+    st.caption(
+        "Each point represents a customer, colored by the selected clustering. "
+        "Axes show original values: days since the latest purchase and total "
+        "spending in the source currency. Hover for values; pan or zoom to explore. "
+        "Customers with identical coordinates overlap. Frequency also contributes "
+        "to clustering but is not shown on these axes."
+    )
+    # Text labels give each cluster a discrete color instead of a numeric gradient.
+    chart_data = clustered_rfm.assign(
+        Cluster="Cluster " + clustered_rfm["Cluster"].astype(str)
+    )
+    st.scatter_chart(
+        chart_data,
+        x="Recency",
+        y="Monetary",
+        color="Cluster",
+        x_label="Recency (days)",
+        y_label="Monetary (source currency)",
     )
 
 
