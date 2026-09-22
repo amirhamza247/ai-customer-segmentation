@@ -167,7 +167,7 @@ def choose_k(scaled_rfm):
         raise ValueError("No candidate K produced the requested number of clusters.")
     results = pd.DataFrame(scores)
     # idxmax returns the first maximum, so an exact tie favors the smaller K.
-    best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"])
+    best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"]) # type: ignore to avoid pylance red error line
     return best_k, results
 
 

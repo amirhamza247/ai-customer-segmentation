@@ -111,10 +111,34 @@ def main():
         return
     st.write(f"Suggested K: {best_k} (highest silhouette score among candidates).")
     st.dataframe(scores, hide_index=True)
+
+
+
+
+# User selectable k-value
+    # Only offer K values that successfully formed clusters during evaluation.
+    # The suggestion is advisory; the widget's returned value controls the fit.
+    available_k = [k for k in (2, 3, 4) if k in scores["K"].values]
+    if not available_k:
+        st.warning("No valid K between 2 and 4 is available for these customers.")
+        return
+    default_k = best_k if best_k in available_k else available_k[0]
+    selected_k = st.selectbox(
+        "K for final clustering",
+        options=available_k,
+        index=available_k.index(default_k),
+        help="Choose 2–4 clusters. Unavailable values are omitted for this dataset. "
+        "Your selection controls customer assignments and the cluster summary.",
+    )
+    
+    
+    
+    
+# Customer cluster assignments
     st.subheader("Customer cluster assignments")
     try:
         with st.spinner("Training the final K-Means model..."):
-            model, assignments = cluster_customers(scaled_rfm, best_k)
+            model, assignments = cluster_customers(scaled_rfm, selected_k)
     except ValueError as error:
         st.error(str(error))
         return
@@ -122,7 +146,7 @@ def main():
     # duplicate IDs multiplying rows. The original RFM table stays unchanged.
     clustered_rfm = rfm.join(assignments, on="Customer ID", validate="one_to_one")
     st.write(
-        f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters."
+        f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters." # type: ignore pylance
     )
     st.caption(
         "The model uses scaled RFM. This table shows original RFM values for "
@@ -131,6 +155,10 @@ def main():
     )
     st.dataframe(clustered_rfm, hide_index=True)
 
+
+
+
+# Cluster summary
     st.subheader("Cluster summary")
     summary = summarize_clusters(clustered_rfm)
     st.caption(
