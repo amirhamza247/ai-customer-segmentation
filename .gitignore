@@ -23,3 +23,7 @@ __pycache__/
 
 /data
 
+
+# Local agent skills (symlinks into .venv, differ per machine)
+.claude/skills/
+.agents/skills/
