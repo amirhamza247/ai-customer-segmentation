@@ -112,9 +112,10 @@ def scale_rfm(rfm):
     # Select features explicitly: customer IDs are labels, not measurements.
     # The index identifies rows but is not passed to StandardScaler or K-Means.
     features = rfm.set_index("Customer ID")[["Recency", "Frequency", "Monetary"]]
-    if features.isna().any().any() or features.isin(
-        [float("inf"), float("-inf")]
-    ).any().any():
+    if (
+        features.isna().any().any()
+        or features.isin([float("inf"), float("-inf")]).any().any()
+    ):
         raise ValueError("RFM values must be finite numbers before scaling.")
 
     if (features[["Frequency", "Monetary"]] < 0).any().any():
@@ -167,7 +168,7 @@ def choose_k(scaled_rfm):
         raise ValueError("No candidate K produced the requested number of clusters.")
     results = pd.DataFrame(scores)
     # idxmax returns the first maximum, so an exact tie favors the smaller K.
-    best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"]) # type: ignore to avoid pylance red error line
+    best_k = int(results.loc[results["Silhouette score"].idxmax(), "K"])  # type: ignore to avoid pylance red error line
     return best_k, results
 
 
@@ -184,7 +185,9 @@ def cluster_customers(scaled_rfm, k):
     model = KMeans(n_clusters=k, n_init=10, random_state=42)
     labels = model.fit_predict(features)
     if len(set(labels)) != k:
-        raise ValueError("The final model could not form the requested number of clusters.")
+        raise ValueError(
+            "The final model could not form the requested number of clusters."
+        )
     # fit_predict returns labels in input row order. Attaching the customer index
     # lets the UI join by ID safely, even if the original RFM rows are reordered.
     assignments = pd.Series(labels, index=features.index, name="Cluster")
@@ -202,3 +205,31 @@ def summarize_clusters(clustered_rfm):
         AverageFrequency=("Frequency", "mean"),
         AverageMonetary=("Monetary", "mean"),
     )
+
+
+def name_clusters(summary, rfm):
+    """Return a summary with descriptions relative to overall customer RFM means."""
+    # Use customer means so small clusters do not receive extra weight.
+    overall_means = rfm[["Recency", "Frequency", "Monetary"]].mean()
+    descriptions = []
+    wording = [
+        ("Recency", "More recent", "Less recent", "Average recency"),
+        ("Frequency", "Lower frequency", "Higher frequency", "Average frequency"),
+        ("Monetary", "Lower spending", "Higher spending", "Average spending"),
+    ]
+    for _, cluster in summary.iterrows():
+        parts = []
+        for feature, below, above, equal in wording:
+            value = cluster["Average" + feature]
+            benchmark = overall_means[feature]
+            if value < benchmark:
+                parts.append(below)
+            elif value > benchmark:
+                parts.append(above)
+            else:
+                parts.append(equal)
+        descriptions.append(" / ".join(parts))
+
+    named_summary = summary.copy()
+    named_summary.insert(1, "Description", descriptions)
+    return named_summary
