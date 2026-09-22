@@ -1,3 +1,5 @@
+from math import ceil, floor, log10
+
 import streamlit as st
 
 from segmentation import (
@@ -6,6 +8,7 @@ from segmentation import (
     choose_k,
     clean_transactions,
     cluster_customers,
+    name_clusters,
     scale_rfm,
     summarize_clusters,
 )
@@ -55,26 +58,20 @@ def main():
     # Limit only the displayed preview; head() does not change cleaned or counts.
     st.dataframe(cleaned.head(1000), hide_index=True)
 
-
-
-
-# Customer RFM
+    # Customer RFM
     with st.spinner("Calculating customer RFM..."):
         rfm, reference_date = calculate_rfm(cleaned)
     st.subheader("Customer RFM")
     st.write(f"{len(rfm):,} customers. Reference date: {reference_date:%Y-%m-%d}.")
     st.caption(
         "Recency: calendar days since the latest purchase (lower means more recent). "
-        
         "Frequency: distinct invoices. Monetary: total Quantity × Price in the "
         "source data's currency. The reference date is one day after the latest "
         "cleaned transaction."
     )
     st.dataframe(rfm, hide_index=True)
 
-
-
-# Scaled RFM
+    # Scaled RFM
     st.subheader("Scaled RFM")
     try:
         scaled_rfm = scale_rfm(rfm)
@@ -112,10 +109,7 @@ def main():
     st.write(f"Suggested K: {best_k} (highest silhouette score among candidates).")
     st.dataframe(scores, hide_index=True)
 
-
-
-
-# User selectable k-value
+    # User selectable k-value
     # Only offer K values that successfully formed clusters during evaluation.
     # The suggestion is advisory; the widget's returned value controls the fit.
     available_k = [k for k in (2, 3, 4) if k in scores["K"].values]
@@ -130,11 +124,8 @@ def main():
         help="Choose 2–4 clusters. Unavailable values are omitted for this dataset. "
         "Your selection controls customer assignments and the cluster summary.",
     )
-    
-    
-    
-    
-# Customer cluster assignments
+
+    # Customer cluster assignments
     st.subheader("Customer cluster assignments")
     try:
         with st.spinner("Training the final K-Means model..."):
@@ -145,38 +136,163 @@ def main():
     # Join by customer ID, not row position. Validation guards against accidental
     # duplicate IDs multiplying rows. The original RFM table stays unchanged.
     clustered_rfm = rfm.join(assignments, on="Customer ID", validate="one_to_one")
+    summary = name_clusters(summarize_clusters(clustered_rfm), rfm)
     st.write(
-        f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters." # type: ignore pylance
+        f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters."  # type: ignore pylance
     )
     st.caption(
         "The model uses scaled RFM. This table shows original RFM values for "
         "interpretation. Cluster IDs start at 0 and are arbitrary labels, not "
-        "rankings. No cluster names have been assigned."
+        "rankings."
     )
     st.dataframe(clustered_rfm, hide_index=True)
 
-
-
-
-# Cluster summary
+    # Cluster summary
     st.subheader("Cluster summary")
-    summary = summarize_clusters(clustered_rfm)
     st.caption(
         "Customer count and mean RFM per cluster, using original values: "
         "Recency in days, Frequency in invoices, and Monetary in the source "
         "data's currency. Each customer has equal weight. Averages can be "
         "influenced by unusually large values."
     )
+    st.caption(
+        "Descriptions compare each cluster's original RFM means with the means "
+        "across all customers in this upload. Lower Recency means more recent "
+        "purchases; exact equality is described as Average. Descriptions summarize "
+        "groups, not every member, and may repeat."
+    )
     # Format only the display; preserve full precision in the summary DataFrame.
     st.dataframe(
         summary,
         hide_index=True,
         column_config={
-            "CustomerCount": st.column_config.NumberColumn("Customer count", format="%d"),
-            "AverageRecency": st.column_config.NumberColumn("Average Recency", format="%.2f"),
-            "AverageFrequency": st.column_config.NumberColumn("Average Frequency", format="%.2f"),
-            "AverageMonetary": st.column_config.NumberColumn("Average Monetary", format="%.2f"),
+            "CustomerCount": st.column_config.NumberColumn(
+                "Customer count", format="%d"
+            ),
+            "AverageRecency": st.column_config.NumberColumn(
+                "Average Recency", format="%.2f"
+            ),
+            "AverageFrequency": st.column_config.NumberColumn(
+                "Average Frequency", format="%.2f"
+            ),
+            "AverageMonetary": st.column_config.NumberColumn(
+                "Average Monetary", format="%.2f"
+            ),
         },
+    )
+
+    st.subheader("Customer segments: Recency vs Monetary")
+    st.caption(
+        "Each point represents a customer, colored by the selected clustering. "
+        "Axes show original values: days since the latest purchase and total "
+        "spending in the source currency. Hover for values; pan or zoom to explore. "
+        "Customers with identical coordinates overlap. Frequency also contributes "
+        "to clustering but is not shown on these axes."
+    )
+    # Text labels give each cluster a discrete color instead of a numeric gradient.
+    chart_data = clustered_rfm.assign(
+        Cluster="Cluster " + clustered_rfm["Cluster"].astype(str)
+    )
+    plot_view = st.radio(
+        "Customers shown in plot",
+        options=["Typical customers (99%)", "All customers"],
+        horizontal=True,
+    )
+    # Filter only the plot copy, using original customer-level Monetary values.
+    monetary_limit = rfm["Monetary"].quantile(0.99)
+    if plot_view == "Typical customers (99%)":
+        chart_data = chart_data.loc[chart_data["Monetary"] <= monetary_limit]
+        st.caption(
+            f"Showing Monetary up to the 99th percentile: {monetary_limit:,.2f} "
+            "in the source currency."
+        )
+    hidden_count = len(clustered_rfm) - len(chart_data)
+    st.caption(
+        f"Showing {len(chart_data):,} of {len(clustered_rfm):,} customers; "
+        f"{hidden_count:,} customers hidden from the plot. "
+        "All customers remain included in clustering, summaries, and assignments."
+    )
+    linear_dataset_name = f"linear_customers_k_{selected_k}"
+    st.vega_lite_chart(
+        spec={
+            "data": {"name": linear_dataset_name},
+            "datasets": {linear_dataset_name: chart_data},
+            "mark": {"type": "circle", "size": 30, "opacity": 0.9},
+            "encoding": {
+                "x": {
+                    "field": "Recency",
+                    "type": "quantitative",
+                    "title": "Recency (days)",
+                },
+                "y": {
+                    "field": "Monetary",
+                    "type": "quantitative",
+                    "title": "Monetary (source currency)",
+                },
+                "color": {"field": "Cluster", "type": "nominal"},
+                "tooltip": [
+                    {"field": "Customer ID", "type": "nominal"},
+                    {"field": "Recency", "type": "quantitative"},
+                    {"field": "Monetary", "type": "quantitative", "format": ",.2f"},
+                    {"field": "Cluster", "type": "nominal"},
+                ],
+            },
+            "params": [{"name": "linear_zoom", "select": "interval", "bind": "scales"}],
+        },
+        width="stretch",
+    )
+
+    # Customer segments: logarithmic Monetary axis
+    st.subheader("Customer segments: logarithmic Monetary axis")
+    st.caption(
+        "The same customers and cluster colors as above. Each step on the "
+        "Monetary axis represents a tenfold increase; hover shows original values."
+    )
+    # Format axis exponents as superscripts; the Monetary data stays unchanged.
+    exponent_label = "format(log(datum.value) / log(10), '.0f')"
+    for digit, superscript in zip("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"):
+        exponent_label = f"replace({exponent_label}, /{digit}/g, '{superscript}')"
+    monetary_ticks = [
+        10**power
+        for power in range(
+            floor(log10(chart_data["Monetary"].min())),
+            ceil(log10(chart_data["Monetary"].max())) + 1,
+        )
+    ]
+    # Changing the named dataset also refreshes the chart spec when K changes.
+    log_dataset_name = f"customers_k_{selected_k}"
+    st.vega_lite_chart(
+        spec={
+            "data": {"name": log_dataset_name},
+            "datasets": {log_dataset_name: chart_data},
+            "mark": {"type": "circle", "size": 30, "opacity": 0.9},
+            "encoding": {
+                "x": {
+                    "field": "Recency",
+                    "type": "quantitative",
+                    "title": "Recency (days)",
+                },
+                "y": {
+                    "field": "Monetary",
+                    "type": "quantitative",
+                    "title": "Monetary (source currency, log scale)",
+                    "scale": {"type": "log", "base": 10},
+                    "axis": {
+                        "values": monetary_ticks,
+                        "labelExpr": "'10' + " + exponent_label,
+                    },
+                },
+                "color": {"field": "Cluster", "type": "nominal"},
+                "tooltip": [
+                    {"field": "Customer ID", "type": "nominal"},
+                    {"field": "Recency", "type": "quantitative"},
+                    {"field": "Monetary", "type": "quantitative", "format": ",.2f"},
+                    {"field": "Cluster", "type": "nominal"},
+                ],
+            },
+            "params": [{"name": "log_zoom", "select": "interval", "bind": "scales"}],
+        },
+        width="stretch",
     )
 
 

@@ -21,4 +21,5 @@ __pycache__/
 .env
 
 
-/data/kunder.db
+/data
+
