@@ -71,7 +71,17 @@ uv sync
 
 This creates the project environment and installs the locked dependencies.
 
-### 4. Start the app
+### 4. Add your Groq API key (optional)
+
+The AI explanation of the clusters uses Groq. Get a free key at https://console.groq.com/keys, then:
+
+```bash
+cp .streamlit/secrets.example.toml .streamlit/secrets.toml
+```
+
+Paste your key between the quotes in `.streamlit/secrets.toml`. That file is in `.gitignore`, so the key is never committed. Without a key, everything except the AI explanation still works.
+
+### 5. Start the app
 
 ```bash
 uv run streamlit run main.py

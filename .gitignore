@@ -10,7 +10,7 @@ __pycache__/
 .pytest_cache/
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
 
 # Dataset och tränade ML-modeller (håller repot lätt)
 *.joblib
