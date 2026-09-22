@@ -202,3 +202,31 @@ def summarize_clusters(clustered_rfm):
         AverageFrequency=("Frequency", "mean"),
         AverageMonetary=("Monetary", "mean"),
     )
+
+
+def name_clusters(summary, rfm):
+    """Return a summary with descriptions relative to overall customer RFM means."""
+    # Use customer means so small clusters do not receive extra weight.
+    overall_means = rfm[["Recency", "Frequency", "Monetary"]].mean()
+    descriptions = []
+    wording = [
+        ("Recency", "More recent", "Less recent", "Average recency"),
+        ("Frequency", "Lower frequency", "Higher frequency", "Average frequency"),
+        ("Monetary", "Lower spending", "Higher spending", "Average spending"),
+    ]
+    for _, cluster in summary.iterrows():
+        parts = []
+        for feature, below, above, equal in wording:
+            value = cluster["Average" + feature]
+            benchmark = overall_means[feature]
+            if value < benchmark:
+                parts.append(below)
+            elif value > benchmark:
+                parts.append(above)
+            else:
+                parts.append(equal)
+        descriptions.append(" / ".join(parts))
+
+    named_summary = summary.copy()
+    named_summary.insert(1, "Description", descriptions)
+    return named_summary

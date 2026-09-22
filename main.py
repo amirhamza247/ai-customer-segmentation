@@ -6,6 +6,7 @@ from segmentation import (
     choose_k,
     clean_transactions,
     cluster_customers,
+    name_clusters,
     scale_rfm,
     summarize_clusters,
 )
@@ -145,13 +146,22 @@ def main():
     # Join by customer ID, not row position. Validation guards against accidental
     # duplicate IDs multiplying rows. The original RFM table stays unchanged.
     clustered_rfm = rfm.join(assignments, on="Customer ID", validate="one_to_one")
+    summary = name_clusters(summarize_clusters(clustered_rfm), rfm)
+    clustered_rfm = clustered_rfm.join(
+        summary.set_index("Cluster")["Description"],
+        on="Cluster",
+        validate="many_to_one",
+    )
     st.write(
         f"Assigned {len(clustered_rfm):,} customers to {model.n_clusters} clusters." # type: ignore pylance
     )
     st.caption(
         "The model uses scaled RFM. This table shows original RFM values for "
         "interpretation. Cluster IDs start at 0 and are arbitrary labels, not "
-        "rankings. No cluster names have been assigned."
+        "rankings. Descriptions compare each cluster's original RFM means with "
+        "the means across all customers in this upload. Lower Recency means "
+        "more recent purchases; exact equality is described as Average. "
+        "Descriptions summarize groups, not every member, and may repeat."
     )
     st.dataframe(clustered_rfm, hide_index=True)
 
@@ -160,7 +170,6 @@ def main():
 
 # Cluster summary
     st.subheader("Cluster summary")
-    summary = summarize_clusters(clustered_rfm)
     st.caption(
         "Customer count and mean RFM per cluster, using original values: "
         "Recency in days, Frequency in invoices, and Monetary in the source "
