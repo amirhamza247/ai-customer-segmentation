@@ -1,102 +1,98 @@
 # Kundsegmentering med RFM och K-Means
 
-**Teknisk rapport, del 2 – projektuppgift**  
-Grupp: Amir Hamza Jafari, Andreas Malmgren, Robin Hellgren  
-Repo: https://github.com/amirhamza247/ai-customer-segmentation
+Projektuppgift del 2  
+Amir Hamza Jafari, Andreas Malmgren och Robin Hellgren  
+GitHub: https://github.com/amirhamza247/ai-customer-segmentation
 
 ## 1. Bakgrund
 
-Företag vill veta vilka kunder som är mest värdefulla, vilka som håller på att försvinna och vilka som bara handlat en gång. Då kan de rikta erbjudanden och kampanjer till rätt grupp. Vi ville bygga ett verktyg som gör den analysen automatiskt: man laddar upp en CSV med transaktioner och får tillbaka kundsegment som går att förstå.
+Vi ville göra något som ett riktigt företag skulle kunna ha nytta av, och valde därför kundsegmentering. Tanken är att ett företag ska kunna dela in sina kunder i grupper, till exempel kunder som handlar ofta och mycket, kunder som bara handlat en gång och kunder som inte kommit tillbaka på länge. Då kan man rikta kampanjer till rätt grupp.
 
-Vi valde datasetet **Online Retail II** (UCI, via Kaggle). Det innehåller alla transaktioner från en brittisk e-handlare mellan 2009-12-01 och 2011-12-09, totalt drygt 1 miljon rader. Varje rad är en produktrad på en faktura med kolumnerna `Invoice`, `Quantity`, `InvoiceDate`, `Price` och `Customer ID`. Datan räcker för vårt mål, eftersom det är precis de fält som behövs för en RFM-analys:
+Vi använder datasetet Online Retail II från Kaggle. Det innehåller transaktioner från en brittisk webbutik mellan december 2009 och december 2011, drygt en miljon rader. Varje rad är en produkt på en faktura, med fakturanummer, antal, datum, pris och kund-ID. Vi tyckte att datan räckte eftersom det är just de kolumnerna som behövs för en RFM-analys:
 
-- **Recency:** antal dagar sedan kundens senaste köp (lägre är bättre).
-- **Frequency:** antal unika fakturor.
-- **Monetary:** total summa (`Quantity × Price`).
+- Recency: hur många dagar sedan kunden handlade senast
+- Frequency: hur många olika fakturor kunden har
+- Monetary: hur mycket kunden har handlat för totalt (antal gånger pris)
 
-Segmenteringen görs med **K-Means**, en oövervakad klustringsalgoritm. Den passar eftersom datan saknar färdiga etiketter som "lojal kund", och den är enkel att förklara.
+För själva segmenteringen använder vi K-Means. Datan har inga färdiga etiketter som säger vilken typ av kund någon är, så det blir oövervakad inlärning. K-Means är också ganska lätt att förklara, vilket var viktigt för oss.
 
-Vi bestämde tidigt att projektet skulle vara en **proof of concept** med fokus på att hela flödet fungerar från uppladdning till resultat. Därför begränsade vi oss till ett känt CSV-format och till RFM-baserad segmentering (inga churn- eller LTV-modeller).
+Vi bestämde tidigt att vi skulle göra en proof of concept och fokusera på att hela flödet fungerar, från att man laddar upp en fil till att man ser segmenten. Därför stödjer appen bara ett CSV-format och vi har inte gjort någon churn- eller LTV-modell.
 
-## 2. Flödet i applikationen
+## 2. Hur appen fungerar
 
-```text
-CSV-uppladdning → validering → rensning → RFM → log1p + StandardScaler
-→ jämför K = 2–8 med silhouette → användaren väljer K (2–4) → K-Means
-→ klustersammanfattning och beskrivningar → spridningsdiagram → AI-förklaring (valfri)
-```
+Användaren laddar upp CSV-filen i Streamlit och sedan händer följande:
 
-1. **Validering och rensning.** Filen läses som text så att ogiltiga värden kan hanteras kontrollerat. Rader tas bort om kund-ID saknas, fakturan är en makulering (börjar på `C`), datumet är ogiltigt eller antal/pris är saknat, oändligt, noll eller negativt. Appen visar hur många rader som tagits bort av varje orsak. Dubblettrader behålls med avsikt, eftersom de kan vara riktiga köp.
-2. **RFM.** Transaktionerna grupperas per kund. Referensdatumet är dagen efter den sista transaktionen i datan, inte dagens datum, så att resultatet blir detsamma varje gång man kör.
-3. **Förbehandling.** Frequency och Monetary är mycket sneda (några få kunder köper för hundratusentals pund), så de log-transformeras med `log1p`. Sedan standardiseras alla tre med `StandardScaler` så att ingen variabel dominerar avståndsberäkningen bara för att den har större enheter. Originalvärdena sparas för att visa och tolka resultatet.
-4. **Val av K.** Appen tränar tillfälliga K-Means-modeller för K = 2–8 och räknar silhouette score för alla kunder. Det bästa K:et föreslås, men användaren väljer själv mellan 2, 3 och 4 kluster.
-5. **Klustring och tolkning.** Den slutliga modellen tränas med `n_init=10` och `random_state=42`. Varje kluster sammanfattas med antal kunder och medelvärden i originalenheter. En regelbaserad beskrivning jämför klustrets medelvärde med snittkunden, till exempel *More recent / Higher frequency / Higher spending*.
-6. **Visualisering.** Interaktiva spridningsdiagram (Recency mot Monetary) med linjär och logaritmisk axel. Man kan välja att dölja den översta procenten av extremkunder i diagrammet utan att de påverkar klustringen.
-7. **AI-förklaring (valfri).** Klustersammanfattningen, alltså inga kund-ID:n eller transaktioner, skickas till en språkmodell via Groq. Den svarar med en kort förklaring på engelska om vilka kluster som står för mest intäkter. Andelar och medelvärden räknas ut i Python innan de skickas, eftersom språkmodeller ofta räknar fel.
+1. Filen valideras och rensas. Vi tar bort rader som saknar kund-ID, makulerade fakturor (de som börjar på C), rader med ogiltigt datum och rader där antal eller pris saknas eller är noll eller negativt. Appen visar hur många rader som togs bort och varför. Dubbletter behåller vi, eftersom samma rad kan vara ett riktigt köp två gånger.
+2. RFM räknas ut per kund. Som referensdatum använder vi dagen efter sista köpet i datan, annars skulle resultatet ändras beroende på vilken dag man kör appen.
+3. Frequency och Monetary är väldigt sneda, några få kunder har handlat för enorma summor. Därför gör vi log1p på dem och sedan StandardScaler på alla tre, så att Monetary inte tar över bara för att siffrorna är större.
+4. Appen testar K från 2 till 8 och räknar silhouette score för varje. Den föreslår det K som fick högst poäng, men användaren väljer själv 2, 3 eller 4.
+5. K-Means tränas med det valda K. För varje kluster visas antal kunder och medelvärden för R, F och M i vanliga enheter. Varje kluster får också en enkel beskrivning som säger om det ligger över eller under snittet, till exempel "More recent / Higher frequency / Higher spending".
+6. Kunderna visas i två spridningsdiagram (Recency mot Monetary), ett med vanlig och ett med logaritmisk skala.
+7. Om man har en API-nyckel kan man be en AI-modell via Groq förklara klustren i text. Vi skickar bara sammanfattningstabellen, inga kund-ID:n. Procentandelarna räknar vi ut själva i Python innan, eftersom språkmodeller ofta räknar fel.
 
-## 3. Huvudresultat
+## 3. Resultat
 
-**Rensning.** Av 1 067 371 rader behölls 805 549. De som togs bort var 243 007 rader utan kund-ID, 18 744 makuleringar och 71 rader med pris 0. Kvar blev **5 878 kunder**, med referensdatum 2011-12-10.
+Datasetet hade 1 067 371 rader och efter rensningen var 805 549 kvar. Det mesta som försvann var rader utan kund-ID (243 007 st). Sedan var det 18 744 makuleringar och 71 rader med pris 0. Kvar blev 5 878 kunder.
 
-**Kunddatan är mycket sned.** Mediankunden har handlat 3 gånger för 899 pund, men medelvärdet är 3 019 pund och den största kunden har handlat för 608 822 pund. Det bekräftade att log-transformering behövdes före klustringen.
+Datan är väldigt sned. Mediankunden har handlat 3 gånger för ungefär 900 pund, men den största kunden har handlat för över 600 000 pund. Det var därför vi behövde log-transformeringen.
 
-**Val av K.**
+Silhouette score för olika K:
 
 | K | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 |---|---|---|---|---|---|---|---|
-| Silhouette | **0,419** | 0,401 | 0,361 | 0,367 | 0,349 | 0,336 | 0,317 |
+| Silhouette | 0,419 | 0,401 | 0,361 | 0,367 | 0,349 | 0,336 | 0,317 |
 
-K = 2 får högst poäng, men K = 3 ligger nästan lika högt och ger en mer användbar uppdelning för ett företag. Därför låter vi användaren välja. Resultatet med **K = 3**:
+K = 2 fick högst poäng men K = 3 var nästan lika bra, och tre grupper säger mer än två. Så här blev det med K = 3:
 
-| Kluster | Beskrivning | Kunder | Recency (dagar) | Frequency | Monetary (£) | Andel av intäkter |
+| Kluster | Beskrivning | Antal kunder | Recency (dagar) | Frequency | Monetary (£) | Andel av intäkterna |
 |---|---|---|---|---|---|---|
-| 1 | Nyligen / ofta / hög köpsumma | 1 689 (29 %) | 58 | 15,9 | 8 691 | **82,7 %** |
-| 2 | Nyligen / sällan / låg köpsumma | 2 352 (40 %) | 93 | 2,9 | 861 | 11,4 % |
-| 0 | Länge sedan / sällan / låg köpsumma | 1 837 (31 %) | 474 | 1,8 | 566 | 5,9 % |
+| 1 | Nyligen, ofta, mycket | 1 689 (29 %) | 58 | 15,9 | 8 691 | 82,7 % |
+| 2 | Nyligen, sällan, lite | 2 352 (40 %) | 93 | 2,9 | 861 | 11,4 % |
+| 0 | Länge sedan, sällan, lite | 1 837 (31 %) | 474 | 1,8 | 566 | 5,9 % |
 
-Det tydligaste resultatet är att **29 % av kunderna står för 83 % av intäkterna**, vilket stämmer med Paretoprincipen. Kluster 0 är kunder som inte handlat på över ett år och troligen redan har lämnat. Kluster 2 är aktiva men handlar sällan. Det är den grupp där det kan löna sig mest att försöka få kunderna att komma tillbaka. Med K = 4 delas de bästa kunderna upp ytterligare: 952 kunder (16 %) står då för 71 % av intäkterna.
+Det vi tycker är mest intressant är att ungefär 29 % av kunderna står för 83 % av intäkterna. Kluster 0 har inte handlat på över ett år och har antagligen slutat handla. Kluster 2 är fortfarande aktiva men köper sällan, så det är kanske där företaget har mest att vinna på att försöka få dem att handla mer. Väljer man K = 4 delas de bästa kunderna upp mer, och då står 952 kunder (16 %) för 71 % av intäkterna.
 
-**Begränsningar.** En silhouette score runt 0,4 betyder att klustren är tydliga men överlappar en del. Kunddata bildar sällan helt separata grupper. Beskrivningarna säger bara om ett kluster ligger över eller under snittet, inte hur mycket. Vi har därför valt att inte ge klustren säljiga namn som "VIP", eftersom det kunde överdriva vad datan faktiskt visar.
+En silhouette score på runt 0,4 betyder att klustren går att skilja åt men att de överlappar en del. Det är ganska normalt för kunddata. Beskrivningarna säger bara om ett kluster ligger över eller under snittet och inte hur mycket, så vi har valt att inte ge klustren namn som "VIP" eller "lojala kunder" eftersom det kan låta mer säkert än det är.
 
-## 4. Teknisk specifikation
+## 4. Teknik
 
-| Del | Teknik | Användning |
-|---|---|---|
-| Språk och miljö | Python 3.14, **uv** | Beroenden låses i `uv.lock`, så alla i gruppen får samma versioner |
-| Databehandling | **pandas**, NumPy | Inläsning, rensning, RFM med `groupby().agg()` |
-| ML | **scikit-learn** | `StandardScaler`, `KMeans`, `silhouette_score` |
-| Frontend | **Streamlit** | Uppladdning, tabeller, val av K, Vega-Lite-diagram |
-| AI-förklaring | **Groq** (`openai/gpt-oss-120b`) | API-nyckeln ligger i `.streamlit/secrets.toml`, som inte checkas in |
-| Kodkvalitet | Ruff, Black | Lint och formatering innan commit |
-| Versionshantering | Git, GitHub | Feature-brancher, pull requests, `dev` och `main` |
+- Python 3.14 med uv för att hantera paket (alla i gruppen får samma versioner via uv.lock)
+- pandas och NumPy för att läsa in och rensa datan och räkna ut RFM
+- scikit-learn för StandardScaler, KMeans och silhouette_score
+- Streamlit för gränssnittet
+- Groq för AI-förklaringen (API-nyckeln ligger i en fil som inte laddas upp till GitHub)
+- Ruff och Black för att hålla koden snygg
+- Git och GitHub för versionshantering
 
-Koden består av tre filer. `segmentation.py` innehåller all logik för databehandling och ML som rena funktioner, en per steg i flödet. `main.py` innehåller bara Streamlit-gränssnittet. `ai_analysis.py` sköter anropet till språkmodellen. Att hålla logiken skild från gränssnittet gör det lättare att testa och förstå.
+Koden ligger i tre filer. segmentation.py har alla funktioner för rensning, RFM, skalning och klustring. main.py är Streamlit-appen. ai_analysis.py sköter anropet till AI-modellen. Vi ville hålla isär logiken och gränssnittet så att det är lättare att förstå vad som händer var.
 
-**Databas.** Kursen kräver att datan lagras i en databas, och vår första version gjorde det. `01_ladda_data.py` laddade CSV:n till SQLite (`data/kunder.db`), SQL-frågor i `queries.py` räknade fram RFM per kund, och den tränade modellen sparades tillsammans med segmenten i `data/app.db`. När vi byggde om till ett uppladdningsflöde kom vi fram till att databasen var negativ för just vårt projekt:
+### Databas
 
-- Varje uppladdning analyseras för sig, så det finns ingen data som behöver sparas mellan körningar. Databasen blev bara en extra kopia av CSV:n.
-- Flödet blev längre och svårare att följa med fyra skript som måste köras i ordning innan appen fungerar. Det blev också ett extra ställe där datan kunde bli inaktuell.
-- Binära filer (`.db` och `.pkl`) i Git gick inte att granska i pull requests.
+Uppgiften säger att datan ska lagras i en databas, och det gjorde vi i vår första version. Där hade vi ett skript som läste in CSV-filen till SQLite, och sedan räknades RFM ut med SQL-frågor. Den tränade modellen och segmenten sparades också i en databas som Streamlit-appen läste från.
 
-Därför behandlas datan nu i minnet med pandas, och vi använder SQLite bara om vi får ett riktigt behov av att spara data, till exempel för att jämföra segment över tid.
+När vi sedan ändrade appen så att man laddar upp sin egen fil kom vi fram till att databasen mest var i vägen för oss:
 
-**Agentisk kodning.** Vi använde AI-kodagenter (Claude Code och Codex) för att skriva mycket av koden. För att behålla kontrollen skrev vi regelfiler (`CLAUDE.md`, senare `AGENTS.md`). De säger att arkitekturen ska vara så liten som möjligt, att inga nya beroenden får läggas till utan skäl och att varje steg ska förklaras så att vi kan stå för varje rad.
+- Varje uppladdning analyseras för sig, så det fanns inget som behövde sparas mellan körningarna. Databasen blev bara en kopia av CSV-filen.
+- Man var tvungen att köra fyra skript i rätt ordning innan appen fungerade, och det var lätt att datan i databasen inte stämde med koden längre.
+- Databasfilerna låg i Git och de går inte att läsa i en pull request.
 
-## 5. Utvärdering av gruppens arbete
+Därför görs allt i minnet med pandas nu. Om vi senare vill spara resultat, till exempel för att jämföra segment över tid, är det då vi skulle lägga tillbaka SQLite.
 
-**Vad har varit bra?** Vi fick ett fungerande flöde från CSV till tolkade segment tidigt, vilket var målet med PoC:n. Att dela upp arbetet i små steg (rensa, RFM, skala, välja K, klustra, namnge, visualisera) gjorde att varje del fungerade innan vi gick vidare. Standups i `MEETINGS.md` hjälpte oss att hålla koll på vem som gjorde vad.
+### AI-verktyg
 
-**Vad har vi lärt oss?**
+Vi har använt AI-kodagenter (Claude Code och Codex) för att skriva en stor del av koden. För att den inte skulle bli för stor och krånglig skrev vi en fil med regler för agenten (först CLAUDE.md, sedan AGENTS.md). Där står bland annat att koden ska vara så enkel som möjligt, att inga nya paket får läggas till utan anledning och att agenten ska förklara det den gör. Vi har försökt se till att vi förstår all kod vi lämnar in.
 
-- Hur man förbereder data för klustring: varför sneda variabler behöver log-transformeras och skalas, och att silhouette score är en vägledning, inte ett facit.
-- Att K-Means kluster-ID:n inte betyder något i sig. Tolkningen måste komma från statistiken för varje kluster.
-- Att arbeta agentiskt: AI-agenter skriver kod snabbt, men utan tydliga regler blir koden större än den behöver vara. Vi lärde oss att styra agenten med regelfiler, granska diffen innan varje commit och kräva förklaringar av det vi inte förstod. Vi provade också att följa agentarbetet tillsammans via Live Share.
+## 5. Utvärdering av vårt arbete
 
-**Hur har Git och GitHub fungerat?** Vi arbetade med feature-brancher per person och uppgift (till exempel `Kmeans-modell-train-robin`, `poc-streamlit-app-andreas`, `ai-segmentation-with-codex-amir`) och slog ihop dem via pull requests till `dev`/`main`. Totalt har vi slagit ihop ett tiotal PR:er. Första dagen övade vi PR-flödet med testfiler, vilket gjorde att alla kom igång. Det som fungerade sämre var att två parallella versioner av appen växte fram på olika brancher (SQLite-skript respektive uppladdningsflödet). Det krävde en omstart och merge-arbete. Vi hade också commit-meddelanden på både svenska och engelska och olika Git-identiteter för samma person.
+Det som gick bra var att vi ganska snabbt fick ett flöde som fungerade hela vägen, vilket var målet med PoC:n. Vi delade upp arbetet i små steg (rensa, RFM, skala, välja K, klustra, beskriva, visualisera) och fick varje del att fungera innan vi gick vidare. Vi hade också standups som vi skrev ner i MEETINGS.md.
 
-**Vad hade vi gjort annorlunda?**
+Vi har lärt oss mycket om hur man förbereder data för klustring, till exempel varför man behöver log-transformera och skala, och att silhouette score bara är en fingervisning. Vi har också lärt oss att klustrens nummer inte betyder något, man måste titta på siffrorna för att förstå vad varje kluster är. En annan stor sak var att jobba med AI-agenter. De skriver kod väldigt snabbt men utan regler blir det lätt mer kod än det behövs. Vi lärde oss att granska diffen innan varje commit och fråga agenten när vi inte förstod något. Ibland satt vi tillsammans i Live Share och följde när en av oss jobbade med agenten.
 
-- Bestämt arkitekturen (uppladdning eller databas) tillsammans *innan* vi började koda, så att vi inte byggt två versioner parallellt.
-- Kommit överens om branch-strategi, språk i commits och code review från start. Code review-delen i `MEETINGS.md` användes knappt.
-- Skrivit några enkla automatiska tester för rensningen och RFM-beräkningen tidigt.
-- Satsat på att driftsätta appen (till exempel Streamlit Community Cloud) för att få en publik länk.
+Med Git och GitHub jobbade vi med en branch per person och uppgift och slog ihop dem med pull requests. Första dagen testade vi hela PR-flödet med några testfiler så att alla visste hur det gick till. Det som fungerade sämre var att två olika versioner av appen byggdes på olika brancher samtidigt, en med SQLite-skript och en med uppladdning. Det gjorde att vi fick börja om lite och lägga tid på att slå ihop. Vi skrev också commit-meddelanden både på svenska och engelska.
+
+Om vi gjorde om projektet skulle vi:
+
+- bestämma arkitekturen tillsammans innan vi började koda, så att vi inte bygger två versioner parallellt
+- komma överens om hur vi jobbar med brancher, commits och code review från början (code review-delen i MEETINGS.md använde vi nästan inte)
+- skriva några enkla tester för rensningen och RFM tidigt
+- försöka lägga upp appen på Streamlit Community Cloud så att den har en länk
