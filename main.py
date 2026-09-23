@@ -50,8 +50,7 @@ def main():
     st.caption("Want to try another dataset?")
     st.caption(
         "[Download 143k-row dataset]"
-        "(https://raw.githubusercontent.com/amirhamza247/ai-customer-segmentation/"
-        "sample-dataet-amir/data/online_retail_II_100k.csv)  \n"
+        "(https://github.com/amirhamza247/ai-customer-segmentation/blob/main/data/online_retail_II_100k.csv)  \n"
         "143k rows · GitHub — faster to download and process."
     )
     st.caption(
