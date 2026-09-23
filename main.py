@@ -1,4 +1,5 @@
 from math import ceil, floor, log10
+from pathlib import Path
 
 import streamlit as st
 from groq import GroqError
@@ -35,29 +36,58 @@ def main():
     """)
     st.title("Customer Segmentation")
     st.caption("Turn customer purchases into clear, useful groups.")
-    uploaded_file = st.file_uploader("Upload your CSV", type="csv")
-    with st.expander("CSV format and sample dataset"):
+    uploaded_file = st.file_uploader(
+        "Upload your CSV",
+        type="csv",
+        on_change=st.session_state.update,
+        args=({"use_sample_data": False},),
+    )
+    st.button(
+        "Use sample data",
+        on_click=st.session_state.update,
+        args=({"use_sample_data": True},),
+    )
+    st.caption("Want to try another dataset?")
+    st.caption(
+        "[Download 143k-row dataset]"
+        "(https://raw.githubusercontent.com/amirhamza247/ai-customer-segmentation/"
+        "sample-dataet-amir/data/online_retail_II_100k.csv)  \n"
+        "143k rows · GitHub — faster to download and process."
+    )
+    st.caption(
+        "[View full dataset on Kaggle]"
+        "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)  \n"
+        "~1M rows · Kaggle — full original dataset; processing may take longer."
+    )
+    with st.expander("CSV format"):
         st.caption("Use a UTF-8, comma-separated CSV.")
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
-        st.caption(
-            "Dataset: [Online Retail II on Kaggle]"
-            "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)"
-        )
-    # Streamlit reruns this function on interaction. Before an upload, the widget
-    # returns None; afterward it returns a file-like object pandas can read.
-    if uploaded_file is None:
+    # Both sources use the same pipeline and cache; callbacks select the source.
+    if st.session_state.get("use_sample_data", False):
+        data_source = Path(__file__).resolve().parent / "data/online_retail_II_sample.csv"
+        try:
+            sample_info = data_source.stat()
+        except OSError:
+            st.error("The sample file is unavailable. Please upload a CSV instead.")
+            return
+        source_id = ("sample", sample_info.st_mtime_ns, sample_info.st_size)
+        st.caption("Using the sample dataset.")
+    elif uploaded_file is not None:
+        data_source = uploaded_file
+        source_id = uploaded_file.file_id
+    else:
         st.session_state.pop("prepared_upload", None)
         st.session_state.pop("cluster_results", None)
         return
 
     # Reuse this upload's results when navigating or changing display controls.
     prepared = st.session_state.get("prepared_upload")
-    if prepared is None or prepared[0] != uploaded_file.file_id:
+    if prepared is None or prepared[0] != source_id:
         try:
             with st.spinner("Validating and cleaning transactions..."):
                 # Tuple unpacking assigns the function's two results in return order.
-                cleaned, removals = clean_transactions(uploaded_file)
+                cleaned, removals = clean_transactions(data_source)
         except ValueError as error:
             # Show expected validation failures to the user. Catching every Exception
             # here could hide programming errors that we need to investigate.
@@ -83,7 +113,7 @@ def main():
             st.warning(str(error))
             return
         prepared = (
-            uploaded_file.file_id, cleaned, removals, rfm, reference_date,
+            source_id, cleaned, removals, rfm, reference_date,
             scaled_rfm, best_k, scores,
         )
         st.session_state["prepared_upload"] = prepared
@@ -363,7 +393,7 @@ def main():
         # Streamlit reruns the script on every interaction, so the explanation is
         # kept in session_state. The key ties it to this upload and K, so a stale
         # explanation is never shown after the user changes either.
-        analysis_key = (uploaded_file.file_id, selected_k)
+        analysis_key = (source_id, selected_k)
         if st.button("Explain clusters with AI", icon=":material/auto_awesome:"):
             silhouette = scores.loc[scores["K"] == selected_k, "Silhouette score"].iloc[
                 0
