@@ -64,4 +64,4 @@ Vi har lärt oss hur man förbereder data för gruppering, att gruppernas nummer
 
 På GitHub hade varje person egna brancher som slogs ihop via pull requests. Det som fungerade sämre var att vi byggde två versioner av appen samtidigt, en med databas och en med uppladdning.
 
-Nästa gång skulle vi bestämma upplägget tillsammans innan vi börjar koda, använda code review mer och lägga ut appen på nätet så att den har en egen länk.
+Nästa gång skulle vi bestämma upplägget tillsammans innan vi börjar koda och använda code review mer.
