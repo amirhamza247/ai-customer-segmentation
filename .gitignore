@@ -27,3 +27,5 @@ __pycache__/
 # Local agent skills (symlinks into .venv, differ per machine)
 .claude/skills/
 .agents/skills/
+
+MEETINGS.md
