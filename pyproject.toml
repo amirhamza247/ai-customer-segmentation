@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "groq>=1.7.0",
     "joblib>=1.6.0",
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
@@ -19,3 +20,4 @@ dev = [
     "black>=26.5.1",
     "ruff>=0.16.7",
 ]
+
