@@ -4,6 +4,8 @@ A simple Streamlit application that segments customers from transaction data usi
 
 The project is currently a proof of concept. A user uploads a transaction CSV, the app cleans the data, calculates customer RFM values, prepares the features for machine learning, compares possible cluster counts, and lets the user choose the final number of clusters. The resulting segments are described, plotted, and can optionally be explained by an AI model.
 
+WebApp: https://ai-segmentation.streamlit.app/
+
 ## What the app does
 
 ```text
