@@ -63,6 +63,8 @@ def main():
         st.caption("Use a UTF-8, comma-separated CSV.")
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
+    st.divider()
+
     # Both sources use the same pipeline and cache; callbacks select the source.
     if st.session_state.get("use_sample_data", False):
         data_source = Path(__file__).resolve().parent / "data/online_retail_II_sample.csv"
