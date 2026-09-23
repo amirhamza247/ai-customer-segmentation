@@ -10,7 +10,7 @@ __pycache__/
 .pytest_cache/
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
 
 # Dataset och tränade ML-modeller (håller repot lätt)
 *.joblib
@@ -23,3 +23,7 @@ __pycache__/
 
 /data
 
+
+# Local agent skills (symlinks into .venv, differ per machine)
+.claude/skills/
+.agents/skills/

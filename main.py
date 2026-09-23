@@ -1,7 +1,10 @@
 from math import ceil, floor, log10
 
 import streamlit as st
+from groq import GroqError
 
+from ai_analysis import MODEL as AI_MODEL
+from ai_analysis import explain_clusters
 from segmentation import (
     REQUIRED_COLUMNS,
     calculate_rfm,
@@ -19,6 +22,10 @@ def main():
     st.write("Upload a UTF-8, comma-separated CSV to validate and clean transactions.")
     st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
     st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
+    st.caption(
+        "Dataset: [Online Retail II on Kaggle]"
+        "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)"
+    )
     # Streamlit reruns this function on interaction. Before an upload, the widget
     # returns None; afterward it returns a file-like object pandas can read.
     uploaded_file = st.file_uploader("Transaction CSV", type="csv")
@@ -294,6 +301,46 @@ def main():
         },
         width="stretch",
     )
+
+    # AI explanation
+    st.subheader("AI explanation")
+    st.caption(
+        f"Sends only the cluster summary table above to Groq ({AI_MODEL}); no "
+        "customer IDs or transactions leave the app. AI text can contain "
+        "mistakes, so check it against the table."
+    )
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+    except FileNotFoundError:
+        api_key = ""
+    if not api_key:
+        st.info(
+            "To enable AI explanations, run "
+            "`cp .streamlit/secrets.example.toml .streamlit/secrets.toml` "
+            "and paste your Groq API key into the new file."
+        )
+        return
+
+    # Streamlit reruns the script on every interaction, so the explanation is
+    # kept in session_state. The key ties it to this upload and K, so a stale
+    # explanation is never shown after the user changes either.
+    analysis_key = (uploaded_file.file_id, selected_k)
+    if st.button("Explain clusters with AI", icon=":material/auto_awesome:"):
+        silhouette = scores.loc[scores["K"] == selected_k, "Silhouette score"].iloc[0]
+        try:
+            with st.spinner("Asking the AI model..."):
+                explanation = explain_clusters(
+                    summary, rfm, selected_k, silhouette, api_key
+                )
+        except GroqError as error:
+            # Covers a wrong key, rate limits on the free tier, and network errors.
+            st.error(f"The AI request failed: {error}")
+            return
+        st.session_state["ai_explanation"] = (analysis_key, explanation)
+
+    saved = st.session_state.get("ai_explanation")
+    if saved is not None and saved[0] == analysis_key:
+        st.markdown(saved[1])
 
 
 # This guard runs the UI when executed, but not when another module imports it.

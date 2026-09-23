@@ -2,7 +2,7 @@
 
 A simple Streamlit application that segments customers from transaction data using **RFM analysis** and **K-Means clustering**.
 
-The project is currently a proof of concept. A user uploads a transaction CSV, the app cleans the data, calculates customer RFM values, prepares the features for machine learning, compares possible cluster counts, and lets the user choose the final number of clusters.
+The project is currently a proof of concept. A user uploads a transaction CSV, the app cleans the data, calculates customer RFM values, prepares the features for machine learning, compares possible cluster counts, and lets the user choose the final number of clusters. The resulting segments are described, plotted, and can optionally be explained by an AI model.
 
 ## What the app does
 
@@ -25,7 +25,11 @@ User selects final K = 2–4
    ↓
 K-Means clustering
    ↓
-Customer assignments and cluster summary
+Customer assignments, cluster summary and descriptions
+   ↓
+Segment scatterplots
+   ↓
+AI explanation (optional, Groq)
 ```
 
 Original RFM values are preserved for display and interpretation. Transformed and standardized values are used for clustering.
@@ -71,7 +75,17 @@ uv sync
 
 This creates the project environment and installs the locked dependencies.
 
-### 4. Start the app
+### 4. Add your Groq API key (optional)
+
+The AI explanation of the clusters uses Groq. Get a free key at https://console.groq.com/keys, then:
+
+```bash
+cp .streamlit/secrets.example.toml .streamlit/secrets.toml
+```
+
+Paste your key between the quotes in `.streamlit/secrets.toml`. That file is in `.gitignore`, so the key is never committed. Without a key, everything except the AI explanation still works.
+
+### 5. Start the app
 
 ```bash
 uv run streamlit run main.py
@@ -80,6 +94,11 @@ uv run streamlit run main.py
 Streamlit will print a local address in the terminal, usually `http://localhost:8501`. Open it in your browser.
 
 ## CSV format
+
+The app is built for the **Online Retail II** dataset. Download `online_retail_II.csv` from Kaggle:
+https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci
+
+CSV files are in `.gitignore`, so keep the file anywhere on your computer and upload it in the app.
 
 Upload a UTF-8, comma-separated CSV containing these required columns:
 
@@ -134,12 +153,19 @@ The selected K controls the final customer assignments and cluster summary.
 
 Cluster IDs such as `0`, `1`, and `2` are arbitrary labels, not rankings.
 
+Each cluster gets a rule-based description, such as `More recent / Higher frequency / Higher spending`, by comparing its average RFM values with the average customer.
+
+The optional **Explain clusters with AI** button sends only the cluster summary (no customer IDs or transactions) to Groq and shows a short explanation of which clusters bring most of the revenue. Revenue shares and averages are calculated in Python, not by the AI model.
+
 ## Project structure
 
 ```text
 ai-customer-segmentation/
 ├── main.py            # Streamlit UI
-├── segmentation.py    # Cleaning, RFM, scaling and clustering
+├── segmentation.py    # Cleaning, RFM, scaling, clustering and descriptions
+├── ai_analysis.py     # AI explanation of the cluster summary (Groq)
+├── .streamlit/
+│   └── secrets.example.toml  # Template for your Groq API key
 ├── pyproject.toml     # Project metadata and dependencies
 ├── uv.lock            # Locked dependencies
 ├── .python-version    # Python version
@@ -177,10 +203,18 @@ git diff
 
 ## Main technologies
 
-Python, Streamlit, pandas, NumPy, scikit-learn, Matplotlib, Seaborn, and uv.
+Python, Streamlit, pandas, NumPy, scikit-learn, Matplotlib, Seaborn, Groq, and uv.
 
 ## Current status
 
-The current POC supports CSV upload and validation, transaction cleaning, RFM feature engineering, log transformation and scaling, silhouette-based K comparison, user-selectable K from 2–4, K-Means clustering, and cluster summaries in original RFM units.
+The current POC supports:
 
-Human-readable cluster naming and final cluster visualizations are planned next.
+- CSV upload, validation and transaction cleaning
+- RFM feature engineering, log transformation and scaling
+- Silhouette-based K comparison and user-selectable K from 2–4
+- K-Means clustering and cluster summaries in original RFM units
+- Rule-based cluster descriptions (above/below the overall RFM averages)
+- Scatterplots of the segments (Recency vs Monetary, linear and log scale)
+- Optional AI explanation of the clusters via Groq
+
+Planned next: a heatmap of segment characteristics.
