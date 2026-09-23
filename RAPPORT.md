@@ -62,6 +62,6 @@ Det gick bra att snabbt få hela flödet att fungera, från uppladdning till fä
 
 Vi har lärt oss hur man förbereder data för gruppering, att gruppernas nummer inte betyder något förrän man tittar på siffrorna, och hur man styr en AI-agent så att koden inte blir onödigt stor.
 
-På GitHub hade varje person egna brancher som slogs ihop via pull requests. Det som fungerade sämre var att vi byggde två versioner av appen samtidigt, en med databas och en med uppladdning, och fick lägga tid på att slå ihop dem.
+På GitHub hade varje person egna brancher som slogs ihop via pull requests. Det som fungerade sämre var att vi byggde två versioner av appen samtidigt, en med databas och en med uppladdning.
 
 Nästa gång skulle vi bestämma upplägget tillsammans innan vi börjar koda, använda code review mer och lägga ut appen på nätet så att den har en egen länk.
