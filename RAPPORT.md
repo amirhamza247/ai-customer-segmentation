@@ -8,7 +8,7 @@ GitHub: https://github.com/amirhamza247/ai-customer-segmentation
 
 Vi har byggt en webbapp som delar in ett företags kunder i grupper utifrån hur de handlar. Då kan företaget till exempel se vilka kunder som ger mest pengar och vilka som har slutat handla.
 
-Vi använder datasetet Online Retail II från Kaggle. Det innehåller alla köp i en brittisk webbutik från december 2009 till december 2011, drygt en miljon rader.
+Vi använder datasetet Online Retail II från Kaggle. Det innehåller alla köp i en brittisk webbutik från december 2009 till december 2011, totalt drygt en miljon rader.
 
 Varje kund beskrivs med tre värden, så kallad RFM:
 
@@ -16,7 +16,7 @@ Varje kund beskrivs med tre värden, så kallad RFM:
 - Frequency: hur många gånger kunden har handlat.
 - Monetary: hur mycket kunden har handlat för totalt.
 
-Sedan grupperar en algoritm som heter K-Means kunder som liknar varandra.
+Kunder med liknande värden grupperas sedan ihop av en algoritm som heter K-Means.
 
 ## 2. Så fungerar appen
 
@@ -32,17 +32,17 @@ Man laddar upp en CSV-fil med köp, och appen gör följande steg:
 
 ## 3. Resultat
 
-Efter rensningen var 805 549 av 1 067 371 rader kvar, fördelade på 5 878 kunder. De flesta borttagna raderna saknade kund-ID.
+Efter rensningen var 805 549 av 1 067 371 rader kvar, från totalt 5 878 kunder. De flesta borttagna raderna saknade kund-ID.
 
 Med tre grupper blev resultatet:
 
-- 29 % av kunderna handlar ofta, mycket och nyligen. De står för 83 % av intäkterna.
-- 40 % av kunderna handlar fortfarande, men sällan och för lite. De står för 11 % av intäkterna.
+- 29 % av kunderna har handlat nyligen, ofta och för mycket pengar. De står för 83 % av intäkterna.
+- 40 % av kunderna handlar fortfarande, men sällan och för små summor. De står för 11 % av intäkterna.
 - 31 % av kunderna har inte handlat på över ett år. De står för 6 % av intäkterna.
 
-Slutsatsen är att knappt en tredjedel av kunderna står för nästan alla intäkter. Den mellersta gruppen är intressantast att satsa på, eftersom de fortfarande handlar men skulle kunna handla mer.
+Slutsatsen är att knappt en tredjedel av kunderna står för nästan alla intäkter. Den andra gruppen är intressantast att satsa på, eftersom de fortfarande handlar men skulle kunna handla mer.
 
-Grupperna går att skilja åt, men gränserna är inte skarpa. Därför har vi inte gett dem namn som "VIP", eftersom det skulle låta säkrare än det är.
+Grupperna går att skilja åt, men gränserna är inte skarpa. Vi har därför inte gett dem namn som "VIP", eftersom det skulle få dem att låta tydligare än de är.
 
 ## 4. Teknik
 
