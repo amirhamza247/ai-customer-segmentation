@@ -31,7 +31,7 @@ def main():
         [data-testid="stSidebarContent"] {padding-top: 2rem;}
         [data-testid="stFileUploaderDropzone"] {border-radius: 12px;}
         [data-testid="stButton"] button {border-radius: 10px;}
-        [data-testid="stExpander"] details {border: 0; border-radius: 10px;}
+        [data-testid="stExpander"] details {margin: -15px ; border: 0; border-radius: 10px;}
         </style>
     """)
     st.title("Customer Segmentation")
@@ -48,16 +48,17 @@ def main():
         args=({"use_sample_data": True},),
     )
     st.caption("Want to try another dataset?")
-    st.caption(
-        "[Download 143k-row dataset]"
-        "(https://github.com/amirhamza247/ai-customer-segmentation/blob/main/data/online_retail_II_100k.csv)  \n"
-        "143k rows · GitHub — faster to download and process."
-    )
-    st.caption(
-        "[View full dataset on Kaggle]"
-        "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)  \n"
-        "~1M rows · Kaggle — full original dataset; processing may take longer."
-    )
+    with st.expander("Download dataset"):
+        st.caption(
+            "[Download 143k-row dataset]"
+            "(https://github.com/amirhamza247/ai-customer-segmentation/blob/main/data/online_retail_II_100k.csv)  \n"
+            "143k rows · GitHub — faster to download and process."
+        )
+        st.caption(
+            "[View full dataset on Kaggle]"
+            "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)  \n"
+            "~1M rows · Kaggle — full original dataset; processing may take longer."
+        )
     with st.expander("CSV format"):
         st.caption("Use a UTF-8, comma-separated CSV.")
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
