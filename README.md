@@ -129,7 +129,7 @@ Extra columns are allowed.
 
 ## Data cleaning
 
-Before segmentation, the app removes rows with missing customer IDs or invoices, cancellation invoices beginning with `C`, invalid dates, invalid/non-finite quantities or prices, and zero or negative quantities or prices.
+Before segmentation, the app removes rows with missing customer IDs or invoices, invalid dates, invalid/non-finite quantities or prices, and zero or negative quantities or prices. Negative quantities cover returns and cancellations.
 
 Duplicate rows are intentionally kept. The app displays how many rows were removed for each reason.
 

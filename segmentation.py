@@ -59,16 +59,17 @@ def clean_transactions(transactions, date_format=DATE_FORMAT):
     # Each rule is a boolean Series (one flag per row). Dictionary insertion
     # order defines which reason wins when a row breaks more than one rule.
     # Use isna(), not == pd.NA, to detect missing values. le(0) means <= 0;
-    # fillna(False) and na=False keep missing values out of these other rules.
+    # fillna(False) keeps missing values out of these other rules.
+    # Returns and cancellations have negative quantities in most transaction
+    # data, so the quantity rule removes them without dataset-specific ID rules.
     rules = {
         "Missing customer ID": transactions["Customer ID"].isna(),
         "Missing invoice": transactions["Invoice"].isna(),
-        "Cancellation invoice (starts with C)": transactions["Invoice"]
-        .str.upper()
-        .str.startswith("C", na=False),
         "Missing or invalid invoice date": transactions["InvoiceDate"].isna(),
         "Missing, invalid, or non-finite quantity": transactions["Quantity"].isna(),
-        "Zero or negative quantity": transactions["Quantity"].le(0).fillna(False),
+        "Zero or negative quantity (e.g. returns, cancellations)": (
+            transactions["Quantity"].le(0).fillna(False)
+        ),
         "Missing, invalid, or non-finite price": transactions["Price"].isna(),
         "Zero or negative price": transactions["Price"].le(0).fillna(False),
     }
