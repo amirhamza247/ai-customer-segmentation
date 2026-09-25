@@ -81,17 +81,20 @@ Required columns:
 - "Invoice": order, invoice, or transaction ID. Several rows may share one.
 - "Quantity": number of units bought on the row.
 - "InvoiceDate": when the purchase happened.
-- "Price": price per unit.
+- "Price": price per ONE unit.
 - "Customer ID": the customer identifier.
+- "Amount": the total value of the row (for example amount, total, sales).
 
 Rules:
 - Use exact column names from the CSV, each at most once. Use null if none fits.
+- Use either Quantity and Price, or Amount, never both. Use Amount when the \
+CSV has no per-unit price column, even if it has a quantity column.
 - "date_format" is a Python strptime format that parses the example \
 InvoiceDate values exactly, for example "%m/%d/%Y %H:%M".
 
 Reply format:
 {"columns": {"Invoice": ..., "Quantity": ..., "InvoiceDate": ..., \
-"Price": ..., "Customer ID": ...}, "date_format": ...}"""
+"Price": ..., "Customer ID": ..., "Amount": ...}, "date_format": ...}"""
 
 
 def suggest_column_mapping(transactions, api_key):
@@ -119,12 +122,16 @@ def suggest_column_mapping(transactions, api_key):
         mapping = {
             target: source
             for target, source in columns.items()
-            if target in REQUIRED_COLUMNS
+            if target in [*REQUIRED_COLUMNS, "Amount"]
             and isinstance(source, str)
             and source in transactions.columns
         }
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as error:
         raise ValueError("The AI returned an unreadable column mapping.") from error
+    if "Amount" in mapping:
+        # Amount replaces Quantity and Price, so ignore any match for them.
+        mapping.pop("Quantity", None)
+        mapping.pop("Price", None)
     if len(set(mapping.values())) != len(mapping):
         raise ValueError("The AI matched one CSV column to several required columns.")
     if not isinstance(date_format, str):

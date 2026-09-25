@@ -78,6 +78,12 @@ def main():
                 transactions = transactions[list(column_mapping.values())].set_axis(
                     list(column_mapping), axis=1
                 )
+                if "Amount" in transactions:
+                    # Quantity 1 × Price = row total, so Monetary stays correct
+                    # and the cleaning and RFM steps need no changes.
+                    transactions = transactions.assign(
+                        Quantity="1", Price=transactions["Amount"]
+                    )
             with st.spinner("Validating and cleaning transactions..."):
                 # Tuple unpacking assigns the function's two results in return order.
                 cleaned, removals = clean_transactions(transactions, date_format)
@@ -121,7 +127,7 @@ def main():
     if column_mapping:
         matches = ", ".join(
             f"{source} → {target}" for target, source in column_mapping.items()
-        )
+        ).replace("→ Amount", "→ Amount (counted as 1 unit per row)")
         st.caption(
             f"AI matched your columns: {matches}. Dates read as `{date_format}`. "
             "Only the header and 3 example rows were sent to Groq."
