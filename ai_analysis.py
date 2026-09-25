@@ -1,4 +1,8 @@
+import json
+
 from groq import Groq
+
+from segmentation import REQUIRED_COLUMNS
 
 # Check https://console.groq.com/docs/models if Groq retires this model.
 MODEL = "openai/gpt-oss-120b"
@@ -68,3 +72,61 @@ def explain_clusters(summary, rfm, k, silhouette, api_key):
         temperature=0.2,
     )
     return response.choices[0].message.content
+
+
+MAPPING_PROMPT = """You match the columns of an uploaded CSV to the columns a \
+customer segmentation pipeline needs. Reply with JSON only.
+
+Required columns:
+- "Invoice": order, invoice, or transaction ID. Several rows may share one.
+- "Quantity": number of units bought on the row.
+- "InvoiceDate": when the purchase happened.
+- "Price": price per unit.
+- "Customer ID": the customer identifier.
+
+Rules:
+- Use exact column names from the CSV, each at most once. Use null if none fits.
+- "date_format" is a Python strptime format that parses the example \
+InvoiceDate values exactly, for example "%m/%d/%Y %H:%M".
+
+Reply format:
+{"columns": {"Invoice": ..., "Quantity": ..., "InvoiceDate": ..., \
+"Price": ..., "Customer ID": ...}, "date_format": ...}"""
+
+
+def suggest_column_mapping(transactions, api_key):
+    """Return {required column: CSV column} and the date format the AI suggests."""
+    # The header and three example rows are enough to recognize each column,
+    # so the rest of the dataset is never sent.
+    examples = transactions.dropna(how="all").head(3).to_csv(index=False)
+    client = Groq(api_key=api_key)
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": MAPPING_PROMPT},
+            {"role": "user", "content": f"CSV header and first rows:\n{examples}"},
+        ],
+        # JSON mode guarantees a reply that json.loads can parse.
+        response_format={"type": "json_object"},
+        # Zero temperature: the same file should get the same mapping.
+        temperature=0,
+    )
+    try:
+        reply = json.loads(response.choices[0].message.content)
+        columns, date_format = reply["columns"], reply["date_format"]
+        # Keep only matches to real CSV columns. A required column the AI
+        # could not match stays absent, so validation names it as missing.
+        mapping = {
+            target: source
+            for target, source in columns.items()
+            if target in REQUIRED_COLUMNS
+            and isinstance(source, str)
+            and source in transactions.columns
+        }
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as error:
+        raise ValueError("The AI returned an unreadable column mapping.") from error
+    if len(set(mapping.values())) != len(mapping):
+        raise ValueError("The AI matched one CSV column to several required columns.")
+    if not isinstance(date_format, str):
+        date_format = None
+    return mapping, date_format

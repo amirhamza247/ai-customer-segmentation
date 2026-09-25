@@ -5,10 +5,11 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 REQUIRED_COLUMNS = ["Invoice", "Quantity", "InvoiceDate", "Price", "Customer ID"]
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-def clean_transactions(csv_file):
-    """Return cleaned transactions and mutually exclusive removal counts."""
+def read_transactions(csv_file):
+    """Read the uploaded CSV with every column as text."""
     try:
         # Read as strings so identifiers keep leading zeros and a bad numeric
         # value can be handled during cleaning. Keep blank rows to count them.
@@ -24,7 +25,13 @@ def clean_transactions(csv_file):
         raise ValueError(
             "Cannot read the file. Use a UTF-8, comma-separated CSV."
         ) from error
+    return transactions
 
+
+def clean_transactions(transactions, date_format=DATE_FORMAT):
+    """Return cleaned transactions and mutually exclusive removal counts."""
+    # Work on a copy so cleaning never changes the caller's DataFrame.
+    transactions = transactions.copy()
     # A list comprehension collects absent names. Membership in a DataFrame
     # checks column names, not the values inside its rows.
     missing = [column for column in REQUIRED_COLUMNS if column not in transactions]
@@ -40,7 +47,7 @@ def clean_transactions(csv_file):
     # "coerce" turns unparseable dates into NaT instead of stopping the upload.
     # An explicit format avoids guessing whether a date is day-first or month-first.
     transactions["InvoiceDate"] = pd.to_datetime(
-        transactions["InvoiceDate"], format="%Y-%m-%d %H:%M:%S", errors="coerce"
+        transactions["InvoiceDate"], format=date_format, errors="coerce"
     )
     for column in ["Quantity", "Price"]:
         # Invalid numbers become missing. Infinity parses as a number, so remove

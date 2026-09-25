@@ -4,14 +4,16 @@ import streamlit as st
 from groq import GroqError
 
 from ai_analysis import MODEL as AI_MODEL
-from ai_analysis import explain_clusters
+from ai_analysis import explain_clusters, suggest_column_mapping
 from segmentation import (
+    DATE_FORMAT,
     REQUIRED_COLUMNS,
     calculate_rfm,
     choose_k,
     clean_transactions,
     cluster_customers,
     name_clusters,
+    read_transactions,
     scale_rfm,
     summarize_clusters,
 )
@@ -41,6 +43,10 @@ def main():
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
         st.caption(
+            "Other column names and date formats are matched automatically "
+            "with AI when a Groq API key is set."
+        )
+        st.caption(
             "Dataset: [Online Retail II on Kaggle]"
             "(https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)"
         )
@@ -51,17 +57,37 @@ def main():
         st.session_state.pop("cluster_results", None)
         return
 
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+    except FileNotFoundError:
+        api_key = ""
+
     # Reuse this upload's results when navigating or changing display controls.
     prepared = st.session_state.get("prepared_upload")
     if prepared is None or prepared[0] != uploaded_file.file_id:
         try:
+            transactions = read_transactions(uploaded_file)
+            column_mapping, date_format = {}, DATE_FORMAT
+            # Only ask the AI when the file does not already use our column names.
+            if api_key and not set(REQUIRED_COLUMNS) <= set(transactions.columns):
+                with st.spinner("Matching your columns with AI..."):
+                    column_mapping, date_format = suggest_column_mapping(
+                        transactions, api_key
+                    )
+                # Select the matched CSV columns, then give them our names.
+                transactions = transactions[list(column_mapping.values())].set_axis(
+                    list(column_mapping), axis=1
+                )
             with st.spinner("Validating and cleaning transactions..."):
                 # Tuple unpacking assigns the function's two results in return order.
-                cleaned, removals = clean_transactions(uploaded_file)
+                cleaned, removals = clean_transactions(transactions, date_format)
         except ValueError as error:
             # Show expected validation failures to the user. Catching every Exception
             # here could hide programming errors that we need to investigate.
             st.error(str(error))
+            return
+        except GroqError as error:
+            st.error(f"The AI column matching failed: {error}")
             return
 
         if cleaned.empty:
@@ -83,12 +109,23 @@ def main():
             st.warning(str(error))
             return
         prepared = (
-            uploaded_file.file_id, cleaned, removals, rfm, reference_date,
-            scaled_rfm, best_k, scores,
+            uploaded_file.file_id, column_mapping, date_format, cleaned, removals,
+            rfm, reference_date, scaled_rfm, best_k, scores,
         )
         st.session_state["prepared_upload"] = prepared
         st.session_state["cluster_results"] = {}
-    _, cleaned, removals, rfm, reference_date, scaled_rfm, best_k, scores = prepared
+    (
+        _, column_mapping, date_format, cleaned, removals,
+        rfm, reference_date, scaled_rfm, best_k, scores,
+    ) = prepared
+    if column_mapping:
+        matches = ", ".join(
+            f"{source} → {target}" for target, source in column_mapping.items()
+        )
+        st.caption(
+            f"AI matched your columns: {matches}. Dates read as `{date_format}`. "
+            "Only the header and 3 example rows were sent to Groq."
+        )
     st.caption(f"Suggested K: {best_k} ? Best silhouette score for this dataset.")
 
     # User selectable k-value
@@ -348,10 +385,6 @@ def main():
             f"Uses group totals only ? Groq ({AI_MODEL}). No customer records are sent. "
             "Check AI insights against your results."
         )
-        try:
-            api_key = st.secrets.get("GROQ_API_KEY", "")
-        except FileNotFoundError:
-            api_key = ""
         if not api_key:
             st.info(
                 "To enable AI explanations, run "
