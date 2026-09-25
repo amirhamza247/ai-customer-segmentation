@@ -84,6 +84,12 @@ def main():
                     transactions = transactions.assign(
                         Quantity="1", Price=transactions["Amount"]
                     )
+                if "Invoice" not in transactions and "InvoiceDate" in transactions:
+                    # Frequency counts unique invoices per customer, so without
+                    # an order ID each distinct purchase time counts as one.
+                    transactions = transactions.assign(
+                        Invoice=transactions["InvoiceDate"]
+                    )
             with st.spinner("Validating and cleaning transactions..."):
                 # Tuple unpacking assigns the function's two results in return order.
                 cleaned, removals = clean_transactions(transactions, date_format)
@@ -132,6 +138,8 @@ def main():
             f"AI matched your columns: {matches}. Dates read as `{date_format}`. "
             "Only the header and 3 example rows were sent to Groq."
         )
+        if "Invoice" not in column_mapping:
+            st.caption("No order ID: each purchase time counts as one purchase.")
     st.caption(f"Suggested K: {best_k} ? Best silhouette score for this dataset.")
 
     # User selectable k-value

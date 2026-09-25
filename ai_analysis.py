@@ -78,7 +78,8 @@ MAPPING_PROMPT = """You match the columns of an uploaded CSV to the columns a \
 customer segmentation pipeline needs. Reply with JSON only.
 
 Required columns:
-- "Invoice": order, invoice, or transaction ID. Several rows may share one.
+- "Invoice": order, invoice, or transaction ID shared by all rows of one \
+purchase. Never a product ID, SKU, or row number: use null if no such column.
 - "Quantity": number of units bought on the row.
 - "InvoiceDate": when the purchase happened.
 - "Price": price per ONE unit.
