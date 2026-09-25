@@ -39,7 +39,7 @@ def main():
     st.caption("Turn customer purchases into clear, useful groups.")
     uploaded_file = st.file_uploader("Upload your CSV", type="csv")
     with st.expander("CSV format and sample dataset"):
-        st.caption("Use a UTF-8, comma-separated CSV.")
+        st.caption("Use a UTF-8, comma- or semicolon-separated CSV.")
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
         st.caption(

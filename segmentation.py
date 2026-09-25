@@ -9,12 +9,19 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def read_transactions(csv_file):
-    """Read the uploaded CSV with every column as text."""
+    """Read an uploaded CSV file object with every column as text."""
+    # European Excel saves CSVs with semicolons because the comma is its decimal
+    # sign. Peek at the header to pick the separator, then rewind for pandas.
+    header = csv_file.readline()
+    csv_file.seek(0)
+    separator = ";" if header.count(b";") > header.count(b",") else ","
     try:
         # Read as strings so identifiers keep leading zeros and a bad numeric
         # value can be handled during cleaning. Keep blank rows to count them.
         # pandas still recognizes default missing-value tokens such as "NA".
-        transactions = pd.read_csv(csv_file, dtype="string", skip_blank_lines=False)
+        transactions = pd.read_csv(
+            csv_file, sep=separator, dtype="string", skip_blank_lines=False
+        )
     except pd.errors.EmptyDataError as error:
         # "from error" preserves the original cause for debugging while giving
         # the UI a simpler, consistent ValueError to display.
@@ -23,8 +30,14 @@ def read_transactions(csv_file):
         ) from error
     except (pd.errors.ParserError, UnicodeDecodeError) as error:
         raise ValueError(
-            "Cannot read the file. Use a UTF-8, comma-separated CSV."
+            "Cannot read the file. Use a UTF-8, comma- or semicolon-separated CSV."
         ) from error
+    if separator == ";":
+        # Only here does "12,50" mean 12.5. In comma files, "1,234" may mean a
+        # thousand, so those are left alone. \1 and \2 keep the matched digits.
+        transactions = transactions.replace(
+            r"^\s*(-?\d+),(\d+)\s*$", r"\1.\2", regex=True
+        )
     return transactions
 
 
