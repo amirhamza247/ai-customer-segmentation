@@ -62,12 +62,21 @@ def main():
             "~1M rows · Kaggle — full original dataset; processing may take longer."
         )
     with st.expander("CSV format"):
-        st.caption("Use a UTF-8 or Latin-1, comma- or semicolon-separated CSV.")
+        st.caption(
+            "Use a UTF-8 or Latin-1 CSV, separated by commas or semicolons. "
+            "In semicolon files, decimal commas such as 12,50 are read as 12.50."
+        )
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
         st.caption(
-            "Other column names and date formats are matched automatically "
-            "with AI when a Groq API key is set."
+            "With a Groq API key set, AI also matches other column names and "
+            "date formats. It then also accepts one total-amount column instead "
+            "of Quantity and Price, and files without an invoice ID (each "
+            "purchase time then counts as one purchase)."
+        )
+        st.caption(
+            "Rows with missing values, or zero or negative Quantity or Price "
+            "(e.g. returns), are removed."
         )
     st.divider()
 
