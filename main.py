@@ -80,7 +80,6 @@ def main():
             st.error("The sample file is unavailable. Please upload a CSV instead.")
             return
         source_id = ("sample", sample_info.st_mtime_ns, sample_info.st_size)
-        st.caption("Using the sample dataset.")
     elif uploaded_file is not None:
         data_source = uploaded_file
         source_id = uploaded_file.file_id
@@ -166,6 +165,9 @@ def main():
         _, column_mapping, date_format, cleaned, removals,
         rfm, reference_date, scaled_rfm, best_k, scores,
     ) = prepared
+    # Reached only after reading and cleaning succeeded; failures return earlier.
+    if isinstance(data_source, Path):
+        st.success(f"Sample data loaded: {len(rfm):,} customers.")
     if column_mapping:
         matches = ", ".join(
             f"{source} → {target}" for target, source in column_mapping.items()
