@@ -17,13 +17,19 @@ __pycache__/
 *.pkl
 *.csv
 
+# Keep only the two bundled datasets available to Git.
+/data/*
+!/data/online_retail_II_sample.csv
+!/data/online_retail_II_100k.csv
+
 # Miljövariabler och nycklar
 .env
 
 
-/data
 
 
 # Local agent skills (symlinks into .venv, differ per machine)
 .claude/skills/
 .agents/skills/
+
+RAPPORT.PDF
