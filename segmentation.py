@@ -19,18 +19,30 @@ def read_transactions(csv_file):
         # Read as strings so identifiers keep leading zeros and a bad numeric
         # value can be handled during cleaning. Keep blank rows to count them.
         # pandas still recognizes default missing-value tokens such as "NA".
-        transactions = pd.read_csv(
-            csv_file, sep=separator, dtype="string", skip_blank_lines=False
-        )
+        try:
+            transactions = pd.read_csv(
+                csv_file, sep=separator, dtype="string", skip_blank_lines=False
+            )
+        except UnicodeDecodeError:
+            # Older Excel/Windows exports use Latin-1. It accepts every byte,
+            # so the second attempt cannot fail on encoding.
+            csv_file.seek(0)
+            transactions = pd.read_csv(
+                csv_file,
+                sep=separator,
+                dtype="string",
+                skip_blank_lines=False,
+                encoding="latin-1",
+            )
     except pd.errors.EmptyDataError as error:
         # "from error" preserves the original cause for debugging while giving
         # the UI a simpler, consistent ValueError to display.
         raise ValueError(
             "The CSV is empty. Upload a file with headers and rows."
         ) from error
-    except (pd.errors.ParserError, UnicodeDecodeError) as error:
+    except pd.errors.ParserError as error:
         raise ValueError(
-            "Cannot read the file. Use a UTF-8, comma- or semicolon-separated CSV."
+            "Cannot read the file. Use a comma- or semicolon-separated CSV."
         ) from error
     if separator == ";":
         # Only here does "12,50" mean 12.5. In comma files, "1,234" may mean a

@@ -102,7 +102,7 @@ https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci
 
 CSV files are in `.gitignore`, so keep the file anywhere on your computer and upload it in the app.
 
-Upload a UTF-8, comma-separated CSV containing these required columns:
+Upload a UTF-8 or Latin-1, comma- or semicolon-separated CSV containing these required columns:
 
 | Column | Description |
 | --- | --- |

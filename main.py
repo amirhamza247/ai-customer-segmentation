@@ -62,7 +62,7 @@ def main():
             "~1M rows · Kaggle — full original dataset; processing may take longer."
         )
     with st.expander("CSV format"):
-        st.caption("Use a UTF-8, comma- or semicolon-separated CSV.")
+        st.caption("Use a UTF-8 or Latin-1, comma- or semicolon-separated CSV.")
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
         st.caption(
