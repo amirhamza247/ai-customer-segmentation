@@ -5,14 +5,16 @@ import streamlit as st
 from groq import GroqError
 
 from ai_analysis import MODEL as AI_MODEL
-from ai_analysis import explain_clusters
+from ai_analysis import explain_clusters, suggest_column_mapping
 from segmentation import (
+    DATE_FORMAT,
     REQUIRED_COLUMNS,
     calculate_rfm,
     choose_k,
     clean_transactions,
     cluster_customers,
     name_clusters,
+    read_transactions,
     scale_rfm,
     summarize_clusters,
 )
@@ -60,9 +62,22 @@ def main():
             "~1M rows · Kaggle — full original dataset; processing may take longer."
         )
     with st.expander("CSV format"):
-        st.caption("Use a UTF-8, comma-separated CSV.")
+        st.caption(
+            "Use a UTF-8 or Latin-1 CSV, separated by commas or semicolons. "
+            "In semicolon files, decimal commas such as 12,50 are read as 12.50."
+        )
         st.caption("Required columns: " + ", ".join(REQUIRED_COLUMNS))
         st.caption("InvoiceDate format: YYYY-MM-DD HH:MM:SS")
+        st.caption(
+            "With a Groq API key set, AI also matches other column names and "
+            "date formats. It then also accepts one total-amount column instead "
+            "of Quantity and Price, and files without an invoice ID (each "
+            "purchase time then counts as one purchase)."
+        )
+        st.caption(
+            "Rows with missing values, or zero or negative Quantity or Price "
+            "(e.g. returns), are removed."
+        )
     st.divider()
 
     # Both sources use the same pipeline and cache; callbacks select the source.
@@ -74,7 +89,6 @@ def main():
             st.error("The sample file is unavailable. Please upload a CSV instead.")
             return
         source_id = ("sample", sample_info.st_mtime_ns, sample_info.st_size)
-        st.caption("Using the sample dataset.")
     elif uploaded_file is not None:
         data_source = uploaded_file
         source_id = uploaded_file.file_id
@@ -83,17 +97,53 @@ def main():
         st.session_state.pop("cluster_results", None)
         return
 
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+    except FileNotFoundError:
+        api_key = ""
+
     # Reuse this upload's results when navigating or changing display controls.
     prepared = st.session_state.get("prepared_upload")
     if prepared is None or prepared[0] != source_id:
         try:
+            if isinstance(data_source, Path):
+                with data_source.open("rb") as sample_file:
+                    transactions = read_transactions(sample_file)
+            else:
+                transactions = read_transactions(data_source)
+            column_mapping, date_format = {}, DATE_FORMAT
+            # Only ask the AI when the file does not already use our column names.
+            if api_key and not set(REQUIRED_COLUMNS) <= set(transactions.columns):
+                with st.spinner("Matching your columns with AI..."):
+                    column_mapping, date_format = suggest_column_mapping(
+                        transactions, api_key
+                    )
+                # Select the matched CSV columns, then give them our names.
+                transactions = transactions[list(column_mapping.values())].set_axis(
+                    list(column_mapping), axis=1
+                )
+                if "Amount" in transactions:
+                    # Quantity 1 × Price = row total, so Monetary stays correct
+                    # and the cleaning and RFM steps need no changes.
+                    transactions = transactions.assign(
+                        Quantity="1", Price=transactions["Amount"]
+                    )
+                if "Invoice" not in transactions and "InvoiceDate" in transactions:
+                    # Frequency counts unique invoices per customer, so without
+                    # an order ID each distinct purchase time counts as one.
+                    transactions = transactions.assign(
+                        Invoice=transactions["InvoiceDate"]
+                    )
             with st.spinner("Validating and cleaning transactions..."):
                 # Tuple unpacking assigns the function's two results in return order.
-                cleaned, removals = clean_transactions(data_source)
+                cleaned, removals = clean_transactions(transactions, date_format)
         except ValueError as error:
             # Show expected validation failures to the user. Catching every Exception
             # here could hide programming errors that we need to investigate.
             st.error(str(error))
+            return
+        except GroqError as error:
+            st.error(f"The AI column matching failed: {error}")
             return
 
         if cleaned.empty:
@@ -115,12 +165,28 @@ def main():
             st.warning(str(error))
             return
         prepared = (
-            source_id, cleaned, removals, rfm, reference_date,
-            scaled_rfm, best_k, scores,
+            source_id, column_mapping, date_format, cleaned, removals,
+            rfm, reference_date, scaled_rfm, best_k, scores,
         )
         st.session_state["prepared_upload"] = prepared
         st.session_state["cluster_results"] = {}
-    _, cleaned, removals, rfm, reference_date, scaled_rfm, best_k, scores = prepared
+    (
+        _, column_mapping, date_format, cleaned, removals,
+        rfm, reference_date, scaled_rfm, best_k, scores,
+    ) = prepared
+    # Reached only after reading and cleaning succeeded; failures return earlier.
+    if isinstance(data_source, Path):
+        st.success(f"Sample data loaded: {len(rfm):,} customers.")
+    if column_mapping:
+        matches = ", ".join(
+            f"{source} → {target}" for target, source in column_mapping.items()
+        ).replace("→ Amount", "→ Amount (counted as 1 unit per row)")
+        st.caption(
+            f"AI matched your columns: {matches}. Dates read as `{date_format}`. "
+            "Only the header and 3 example rows were sent to Groq."
+        )
+        if "Invoice" not in column_mapping:
+            st.caption("No order ID: each purchase time counts as one purchase.")
     st.caption(f"Suggested K: {best_k} ? Best silhouette score for this dataset.")
 
     # User selectable k-value
@@ -380,10 +446,6 @@ def main():
             f"Uses group totals only ? Groq ({AI_MODEL}). No customer records are sent. "
             "Check AI insights against your results."
         )
-        try:
-            api_key = st.secrets.get("GROQ_API_KEY", "")
-        except FileNotFoundError:
-            api_key = ""
         if not api_key:
             st.info(
                 "To enable AI explanations, run "

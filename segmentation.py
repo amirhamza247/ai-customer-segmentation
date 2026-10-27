@@ -5,26 +5,58 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 REQUIRED_COLUMNS = ["Invoice", "Quantity", "InvoiceDate", "Price", "Customer ID"]
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-def clean_transactions(csv_file):
-    """Return cleaned transactions and mutually exclusive removal counts."""
+def read_transactions(csv_file):
+    """Read an uploaded CSV file object with every column as text."""
+    # European Excel saves CSVs with semicolons because the comma is its decimal
+    # sign. Peek at the header to pick the separator, then rewind for pandas.
+    header = csv_file.readline()
+    csv_file.seek(0)
+    separator = ";" if header.count(b";") > header.count(b",") else ","
     try:
         # Read as strings so identifiers keep leading zeros and a bad numeric
         # value can be handled during cleaning. Keep blank rows to count them.
         # pandas still recognizes default missing-value tokens such as "NA".
-        transactions = pd.read_csv(csv_file, dtype="string", skip_blank_lines=False)
+        try:
+            transactions = pd.read_csv(
+                csv_file, sep=separator, dtype="string", skip_blank_lines=False
+            )
+        except UnicodeDecodeError:
+            # Older Excel/Windows exports use Latin-1. It accepts every byte,
+            # so the second attempt cannot fail on encoding.
+            csv_file.seek(0)
+            transactions = pd.read_csv(
+                csv_file,
+                sep=separator,
+                dtype="string",
+                skip_blank_lines=False,
+                encoding="latin-1",
+            )
     except pd.errors.EmptyDataError as error:
         # "from error" preserves the original cause for debugging while giving
         # the UI a simpler, consistent ValueError to display.
         raise ValueError(
             "The CSV is empty. Upload a file with headers and rows."
         ) from error
-    except (pd.errors.ParserError, UnicodeDecodeError) as error:
+    except pd.errors.ParserError as error:
         raise ValueError(
-            "Cannot read the file. Use a UTF-8, comma-separated CSV."
+            "Cannot read the file. Use a comma- or semicolon-separated CSV."
         ) from error
+    if separator == ";":
+        # Only here does "12,50" mean 12.5. In comma files, "1,234" may mean a
+        # thousand, so those are left alone. \1 and \2 keep the matched digits.
+        transactions = transactions.replace(
+            r"^\s*(-?\d+),(\d+)\s*$", r"\1.\2", regex=True
+        )
+    return transactions
 
+
+def clean_transactions(transactions, date_format=DATE_FORMAT):
+    """Return cleaned transactions and mutually exclusive removal counts."""
+    # Work on a copy so cleaning never changes the caller's DataFrame.
+    transactions = transactions.copy()
     # A list comprehension collects absent names. Membership in a DataFrame
     # checks column names, not the values inside its rows.
     missing = [column for column in REQUIRED_COLUMNS if column not in transactions]
@@ -40,7 +72,7 @@ def clean_transactions(csv_file):
     # "coerce" turns unparseable dates into NaT instead of stopping the upload.
     # An explicit format avoids guessing whether a date is day-first or month-first.
     transactions["InvoiceDate"] = pd.to_datetime(
-        transactions["InvoiceDate"], format="%Y-%m-%d %H:%M:%S", errors="coerce"
+        transactions["InvoiceDate"], format=date_format, errors="coerce"
     )
     for column in ["Quantity", "Price"]:
         # Invalid numbers become missing. Infinity parses as a number, so remove
@@ -52,16 +84,17 @@ def clean_transactions(csv_file):
     # Each rule is a boolean Series (one flag per row). Dictionary insertion
     # order defines which reason wins when a row breaks more than one rule.
     # Use isna(), not == pd.NA, to detect missing values. le(0) means <= 0;
-    # fillna(False) and na=False keep missing values out of these other rules.
+    # fillna(False) keeps missing values out of these other rules.
+    # Returns and cancellations have negative quantities in most transaction
+    # data, so the quantity rule removes them without dataset-specific ID rules.
     rules = {
         "Missing customer ID": transactions["Customer ID"].isna(),
         "Missing invoice": transactions["Invoice"].isna(),
-        "Cancellation invoice (starts with C)": transactions["Invoice"]
-        .str.upper()
-        .str.startswith("C", na=False),
         "Missing or invalid invoice date": transactions["InvoiceDate"].isna(),
         "Missing, invalid, or non-finite quantity": transactions["Quantity"].isna(),
-        "Zero or negative quantity": transactions["Quantity"].le(0).fillna(False),
+        "Zero or negative quantity (e.g. returns, cancellations)": (
+            transactions["Quantity"].le(0).fillna(False)
+        ),
         "Missing, invalid, or non-finite price": transactions["Price"].isna(),
         "Zero or negative price": transactions["Price"].le(0).fillna(False),
     }
